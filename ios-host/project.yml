@@ -1,0 +1,44 @@
+name: HostApp
+options:
+  bundleIdPrefix: com.example.sampleexpobrownfield
+  createIntermediateGroups: true
+  deploymentTarget:
+    iOS: "16.4"
+
+packages:
+  # Produced by `npm run brownfield:ios` in ../expo-app.
+  # The `-release` suffix comes from expo-brownfield: precompiled builds emit
+  # one Swift Package per build configuration.
+  RepoSearchKitPackage:
+    path: ../expo-app/artifacts/RepoSearchKitPackage-release
+
+targets:
+  HostApp:
+    type: application
+    platform: iOS
+    sources:
+      - path: HostApp
+    info:
+      path: HostApp/Info.plist
+      properties:
+        UILaunchScreen: {}
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+        # Required so the debug flavor can reach the Metro bundler over http://localhost:8081.
+        NSAppTransportSecurity:
+          NSAllowsArbitraryLoads: false
+          NSAllowsLocalNetworking: true
+        NSLocalNetworkUsageDescription: Allows the React Native screen to connect to the Metro bundler during development.
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.example.sampleexpobrownfield.host
+        MARKETING_VERSION: "1.0"
+        CURRENT_PROJECT_VERSION: "1"
+        SWIFT_VERSION: "5.0"
+        TARGETED_DEVICE_FAMILY: "1,2"
+        CODE_SIGN_STYLE: Automatic
+    dependencies:
+      - package: RepoSearchKitPackage
+        product: RepoSearchKitPackage-release

@@ -72,6 +72,9 @@ jobs:
           cache: npm
           cache-dependency-path: expo-app/package-lock.json
 
+      - name: Set up Aikido Safe Chain
+        uses: ./.github/actions/setup-safe-chain
+
       - name: Install dependencies
         working-directory: expo-app
         run: npm ci
@@ -141,9 +144,15 @@ jobs:
           cache: npm
           cache-dependency-path: expo-app/package-lock.json
 
+      - name: Set up Aikido Safe Chain
+        uses: ./.github/actions/setup-safe-chain
+
       - name: Install dependencies
         working-directory: expo-app
         run: npm ci
+
+      - name: Validate the Gradle wrapper
+        uses: gradle/actions/wrapper-validation@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6.3.0
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6.3.0

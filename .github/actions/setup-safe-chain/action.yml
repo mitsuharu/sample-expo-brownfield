@@ -1,0 +1,44 @@
+name: Set up Aikido Safe Chain
+description: >
+  Installs Aikido Safe Chain so npm calls in later steps are screened for
+  known-malicious packages before anything is downloaded.
+
+runs:
+  using: composite
+  steps:
+    - name: Install Safe Chain
+      shell: bash
+      env:
+        # Pinned, and the download is checked against the checksum published
+        # with the release — a security tool is the last thing to fetch from a
+        # moving target.
+        VERSION: 1.5.15
+        CHECKSUM: de0565e3d6346407a604e84e639e95fea8758748063da2216bbfdca5feda5dd2
+      run: |
+        set -euo pipefail
+        url="https://github.com/AikidoSec/safe-chain/releases/download/${VERSION}/install-safe-chain.sh"
+        curl -fsSL "$url" -o /tmp/install-safe-chain.sh
+        if command -v sha256sum >/dev/null 2>&1; then
+          echo "${CHECKSUM}  /tmp/install-safe-chain.sh" | sha256sum -c -
+        else
+          echo "${CHECKSUM}  /tmp/install-safe-chain.sh" | shasum -a 256 -c -
+        fi
+        sh /tmp/install-safe-chain.sh --ci
+        rm /tmp/install-safe-chain.sh
+
+    # actions/setup-node also prepends to GITHUB_PATH, so whichever runs last
+    # wins. Fail loudly rather than leave the install silently unscreened.
+    - name: Verify the shim is active
+      shell: bash
+      run: |
+        set -euo pipefail
+        resolved="$(command -v npm)"
+        echo "npm resolves to: $resolved"
+        case "$resolved" in
+          *safe-chain*) ;;
+          *)
+            echo "::error::npm does not resolve to a Safe Chain shim. Move this action after actions/setup-node."
+            exit 1
+            ;;
+        esac
+        npm --version

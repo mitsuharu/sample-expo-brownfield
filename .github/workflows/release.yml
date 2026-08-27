@@ -12,24 +12,53 @@ on:
 permissions:
   contents: write
 
-env:
-  TAG: ${{ github.event.inputs.tag || github.ref_name }}
-
 # Release artifacts are deliberately built without a build cache: a stale
 # restore would ship the wrong binaries.
 jobs:
+  preflight:
+    name: Resolve the tag
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.resolve.outputs.tag }}
+    steps:
+      - name: Resolve and validate the tag
+        id: resolve
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVENT: ${{ github.event_name }}
+          REPO: ${{ github.repository }}
+          TAG: ${{ github.event.inputs.tag || github.ref_name }}
+        run: |
+          if [[ "$EVENT" == "workflow_dispatch" ]]; then
+            if [[ ! "$TAG" =~ ^[0-9]+\.[0-9]+\.[0-9]+ ]]; then
+              echo "::error::'$TAG' is not a version number. Expected 1.2.3, with no v prefix."
+              exit 1
+            fi
+            # The tag is created by the release job, once the artifacts exist.
+            # Refusing here keeps a released version from being rebuilt from a
+            # different commit.
+            if gh api "repos/$REPO/git/ref/tags/$TAG" --silent 2>/dev/null; then
+              echo "::error::Tag $TAG already exists. Push it to release it, or pick a new version."
+              exit 1
+            fi
+            echo "$TAG will be created on ${{ github.ref_name }} (${{ github.sha }}) after the artifacts are built."
+          fi
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+
   ios:
     name: iOS artifacts
+    needs: preflight
     runs-on: macos-15
     timeout-minutes: 120
     env:
+      TAG: ${{ needs.preflight.outputs.tag }}
       LANG: en_US.UTF-8
       LC_ALL: en_US.UTF-8
     steps:
+      # No ref: the default is github.sha, which is the tagged commit on a tag
+      # push and the head of the selected branch on a manual run.
       - name: Checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          ref: ${{ github.event.inputs.tag || github.ref }}
 
       - name: Select Xcode
         run: |
@@ -85,13 +114,16 @@ jobs:
 
   android:
     name: Android artifacts
+    needs: preflight
     runs-on: ubuntu-latest
     timeout-minutes: 60
+    env:
+      TAG: ${{ needs.preflight.outputs.tag }}
     steps:
+      # No ref: the default is github.sha, which is the tagged commit on a tag
+      # push and the head of the selected branch on a manual run.
       - name: Checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          ref: ${{ github.event.inputs.tag || github.ref }}
 
       - name: Set up JDK
         uses: actions/setup-java@dd06d9cba3e5552c54d9f8ea23572deb30010f7c # v6.0.0
@@ -145,7 +177,7 @@ jobs:
 
   release:
     name: Publish the release
-    needs: [ios, android]
+    needs: [preflight, ios, android]
     runs-on: ubuntu-latest
     steps:
       - name: Download the artifacts from both platforms
@@ -160,6 +192,9 @@ jobs:
       - name: Create the GitHub release
         uses: softprops/action-gh-release@3d0d9888cb7fd7b750713d6e236d1fcb99157228 # v3.0.2
         with:
-          tag_name: ${{ github.event.inputs.tag || github.ref_name }}
+          tag_name: ${{ needs.preflight.outputs.tag }}
+          # Creates the tag on a manual run; ignored when the tag already
+          # exists, which is the case for a tag push.
+          target_commitish: ${{ github.sha }}
           generate_release_notes: true
           files: dist/*

@@ -617,7 +617,7 @@ Kotlin には lint を入れていません（必要なら ktlint / detekt が�
 
 ### CI（`ci.yml`）
 
-Pull Request と `main` への push で走ります。
+Pull Request の作成・更新・再オープンで走ります。
 
 | ジョブ | ランナー | 内容 |
 | --- | --- | --- |
@@ -628,13 +628,34 @@ Pull Request と `main` への push で走ります。
 ホストアプリのテストは**成果物に依存する**ため、ジョブ内で先に xcframework / AAR を
 作ってから実行します。ここが通れば「ビルドできて、かつ組み込んだ状態で動く」ことの確認になります。
 
-> iOS ジョブは pod install と xcframework のビルドを含むため、1 回あたり数十分かかります。
-> public リポジトリなので実行時間の課金はありませんが、無駄な実行を減らすために
-> 同一ブランチの古い実行は `concurrency` で自動キャンセルしています。
+バージョンはリポジトリ直下のファイルで固定しています。
+ローカルと CI で同じものを使うためです。
+
+| ファイル | 用途 |
+| --- | --- |
+| `.node-version` | Node.js のバージョン。`actions/setup-node` の `node-version-file` が読む |
+| `.xcode-version` | Xcode のバージョン。ランナー同梱の `xcodes` CLI で選択する |
+
+`actions/*` などのアクションは**コミット SHA で固定**しています
+（[GitHub の推奨](https://docs.github.com/en/actions/security-for-github-actions/security-guides/security-hardening-for-github-actions#using-third-party-actions)）。
+更新時は SHA と行末のバージョンコメントを揃えて変更してください。
+
+キャッシュしているもの:
+
+| 対象 | 効果 |
+| --- | --- |
+| npm（`setup-node`） | 依存のダウンロード |
+| CocoaPods のダウンロードキャッシュ | podspec と pod ソースの取得 |
+| `ExpoModulesJSI.xcframework` | pod install 中のソースビルド。ビルドスクリプト自身がソースとツールチェーンのハッシュで再検証するため、古い復元は自動で作り直される |
+| Gradle（`setup-gradle`） | 依存と configuration cache |
+
+**リリースワークフローではビルドキャッシュを使いません。** 古い復元が混入すると
+誤ったバイナリを配布してしまうためです。
 
 ### リリース（`release.yml`）
 
-`v` で始まるタグを push すると走ります（`workflow_dispatch` で手動実行も可能）。
+`1.0.0` のようなバージョン番号のタグを push すると走ります
+（`v` の接頭辞は不要です。`workflow_dispatch` で手動実行も可能）。
 成果物を GitHub Release に添付します。
 
 | ファイル | 内容 |

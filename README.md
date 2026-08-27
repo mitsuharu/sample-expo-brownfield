@@ -16,7 +16,10 @@ XCFramework（Swift Package）に固めて、ネイティブの iOS ホストア
 ネイティブ側で検索ワードを入力して React Native 画面を開き、検索した結果を
 ネイティブ側に返して表示するまでの往復です。
 
-**▶ [操作の様子（16 秒）](docs/demo.mov)**
+<details>
+  <summary>操作の様子（16 秒</summary>
+  <iframe width="560" height="315" src="https://www.youtube.com/embed/9-VWQvPKPjQ?si=unkCYCpok7aLHbx6" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
+</details>
 
 左のネイティブ画面には、検索ワードの入力欄、React Native 画面への 2 つの入口
 （SwiftUI / UIKit）、そして React Native から受け取った検索結果が並んでいます。

@@ -25,6 +25,10 @@ android {
 
   buildFeatures { compose = true }
 
+  // Robolectric provides Looper/Context, so the bridge and the Activity glue
+  // can be covered by plain unit tests instead of instrumentation tests.
+  testOptions { unitTests.isReturnDefaultValues = true }
+
   compileOptions {
     sourceCompatibility = JavaVersion.VERSION_17
     targetCompatibility = JavaVersion.VERSION_17
@@ -36,7 +40,7 @@ android {
 dependencies {
   // The brownfield library. Coordinates come from `android` in the
   // expo-brownfield plugin config (group : libraryName : version).
-  implementation("com.example.sampleexpobrownfield:reposearchkit:1.0.0")
+  implementation("com.example.sampleexpobrownfield:reposearchkit:1.0.1")
 
   // BrownfieldActivity extends AppCompatActivity, and the React Native view is
   // hosted through a Fragment, so the host app provides both.
@@ -50,4 +54,8 @@ dependencies {
   implementation("androidx.compose.ui:ui")
   implementation("androidx.compose.material3:material3")
   debugImplementation("androidx.compose.ui:ui-tooling")
+
+  testImplementation("junit:junit:4.13.2")
+  testImplementation("org.robolectric:robolectric:4.14.1")
+  testImplementation("androidx.test:core:1.6.1")
 }

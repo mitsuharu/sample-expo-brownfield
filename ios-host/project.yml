@@ -42,3 +42,16 @@ targets:
     dependencies:
       - package: RepoSearchKitPackage
         product: RepoSearchKitPackage-release
+
+  HostAppTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - path: HostAppTests
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.example.sampleexpobrownfield.host.tests
+        SWIFT_VERSION: "5.0"
+        GENERATE_INFOPLIST_FILE: YES
+    dependencies:
+      - target: HostApp

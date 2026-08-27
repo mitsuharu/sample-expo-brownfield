@@ -6,6 +6,8 @@ import android.os.Bundle
 import android.widget.Toast
 import androidx.core.os.bundleOf
 import com.example.sampleexpobrownfield.reposearchkit.BrownfieldActivity
+import com.example.sampleexpobrownfield.reposearchkit.RepoSearchBridge
+import com.example.sampleexpobrownfield.reposearchkit.RepoSearchEvent
 import com.example.sampleexpobrownfield.reposearchkit.ReactNativeHostManager
 import com.example.sampleexpobrownfield.reposearchkit.ReactNativeViewFactory
 import com.example.sampleexpobrownfield.reposearchkit.setUpNativeBackHandling

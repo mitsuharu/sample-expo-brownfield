@@ -17,19 +17,22 @@ sample-expo-brownfield/
 │   │   ├── components/RepositoryRow.tsx
 │   │   ├── native/bridge.ts           # initialProps の型 / ネイティブへの通知
 │   │   └── screens/RepoSearchScreen.tsx   # 検索画面の本体
+│   ├── native/
+│   │   ├── ios/RepoSearchBridge.swift      # xcframework に同梱する Swift
+│   │   └── android/RepoSearchBridge.kt     # AAR に同梱する Kotlin
+│   ├── plugins/withRepoSearchBridge.js     # 上記を各ターゲットに注入する config plugin
 │   ├── app.json           # expo-brownfield / expo-build-properties プラグイン設定
 │   └── ios/               # `expo prebuild` の生成物（RepoSearchKit ターゲットを含む）
 ├── ios-host/     # 生成物を取り込む素の SwiftUI アプリ（XcodeGen でプロジェクト生成）
 │   ├── project.yml
 │   └── HostApp/
-│       ├── ContentView.swift       # 検索ワード入力 + 受信結果の表示
-│       └── RepoSearchBridge.swift  # RN → ネイティブの delegate / クロージャ
+│       └── ContentView.swift       # 検索ワード入力 + 受信結果の表示
 └── android-host/ # AAR を取り込む素の Compose アプリ
     ├── settings.gradle.kts         # local-repo/ を Maven リポジトリとして参照
     └── app/src/main/java/.../host/
         ├── MainActivity.kt         # 検索ワード入力 + 受信結果の表示
         ├── RepoSearchActivity.kt   # RN 画面を表示する BrownfieldActivity
-        └── RepoSearchBridge.kt     # RN → ネイティブの listener / ラムダ
+        └── RepoSearchViewModel.kt  # 受信結果の保持
 ```
 
 ## 必要環境
@@ -202,7 +205,7 @@ export function notifySearchSucceeded(keyword: string, repositories: Repository[
 ```
 
 ネイティブ側は `BrownfieldMessaging.addListener` で受け取ります。生のペイロードは
-`[String: Any?]` なので、[`RepoSearchBridge`](ios-host/HostApp/RepoSearchBridge.swift) で
+`[String: Any?]` なので、[`RepoSearchBridge`](expo-app/native/ios/RepoSearchBridge.swift) で
 型付きの `RepoSearchEvent` に変換し、メインキューで **delegate とクロージャの両方**に流しています。
 
 ```swift
@@ -236,6 +239,66 @@ bridge.start()
 > - `NavigationStack` でリンクを push すると root View の `onDisappear` が発火します。
 >   リスナーの解除をそこに書くと、RN 画面からのメッセージを取りこぼします
 >   （サンプルでは `NavigationStack` 自体に付けています）。
+
+### 5-3. bridge をフレームワーク / ライブラリ側に持たせる
+
+`RepoSearchBridge`（型変換とイベント定義）は **`RepoSearchKit.xcframework` と
+`reposearchkit.aar` の中**にあります。ホストアプリは成果物を取り込むだけで
+`RepoSearchEvent` を受け取れて、メッセージのワイヤフォーマットを知る必要がありません。
+どちらのホストアプリにも bridge のコードは 1 行もありません。
+
+`ios/` `android/` は `expo prebuild` で毎回作り直されるので、手で追加したファイルは消えます。
+そこで自前の config plugin
+[`plugins/withRepoSearchBridge.js`](expo-app/plugins/withRepoSearchBridge.js) が、
+`native/` 以下のソースを prebuild のたびに各ターゲットへ配置します。
+
+```json
+[
+  "./plugins/withRepoSearchBridge",
+  {
+    "ios": { "targetName": "RepoSearchKit", "sources": ["native/ios/RepoSearchBridge.swift"] },
+    "android": {
+      "libraryName": "reposearchkit",
+      "packageName": "com.example.sampleexpobrownfield.reposearchkit",
+      "sources": ["native/android/RepoSearchBridge.kt"]
+    }
+  }
+]
+```
+
+**Android は簡単です。** Gradle がディレクトリ規約でソースを拾うので、
+`android/<libraryName>/src/main/java/<package>/` にコピーするだけで済みます
+（`withDangerousMod`）。プロジェクトファイルをいじる必要も、
+expo-brownfield との実行順を気にする必要もありません。
+
+**iOS は Xcode プロジェクトへの登録が必要**で、ここに落とし穴が集中しています。
+
+> - **mod は登録と逆順に実行されます**（自分の action を実行してから、前に登録された mod を呼ぶ）。
+>   expo-brownfield の *後* に走らせたいので、`plugins` 配列では **expo-brownfield より前**に置きます。
+> - pbxproj のターゲット名は `"RepoSearchKit"` とクォート付きで格納されています。
+> - フレームワークターゲットのコンパイルフェーズは、コメントが `Sources` ではなく
+>   **ターゲット名**で登録されています。そのため `addSourceFile()` はこれを見つけられず、
+>   **エラーも出さずにアプリ側ターゲットにファイルを追加します**
+>   （ビルドは通るのにフレームワークにシンボルが入らない、という分かりにくい失敗になります）。
+>   ターゲットからフェーズを直接引く必要があります。
+> - グループがディレクトリのパスを持っているので、ファイル参照は**ベース名だけ**にします
+>   （`<target>/<file>` を渡すと `<target>/<target>/<file>` に解決されて
+>   `Build input file cannot be found` になります）。
+> - xcframework を作り直したら **Xcode の DerivedData を消してください**。
+>   ローカル Swift Package のバイナリターゲットはキャッシュされるため、
+>   古い API のままビルドされて `cannot find type ... in scope` になります。
+>   Android も同様で、同じバージョンで publish し直したときは
+>   `./gradlew --refresh-dependencies` が必要です。
+
+#### この構成の検証について
+
+`native/` のソースはどのプロジェクトにも属さないので、**担保はコンパイルが通ることだけ**です。
+
+- `npm run brownfield:ios` / `brownfield:android` が各ターゲットをビルドするため、
+  壊れていれば成果物の生成が失敗します。
+- prebuild 後に `ios/expoapp.xcworkspace` や `android/` を IDE で開けば補完も型チェックも効きますが、
+  **それはコピーの方**です。直すのは `native/` 側で、コピーへの変更は次の prebuild で消えます。
+- ユニットテストはありません。型変換ロジックは実機で動かして確認しています。
 
 ### API 一覧
 
@@ -301,14 +364,13 @@ dependencyResolutionManagement {
 
 // app/build.gradle.kts — group : libraryName : version
 implementation("com.example.sampleexpobrownfield:reposearchkit:1.0.0")
-
-// BrownfieldMessaging / BrownfieldState を使うために必要
-implementation("expo.modules.brownfield:expo.modules.brownfield:57.0.14")
 ```
 
+> ホストアプリから `BrownfieldMessaging` を直接使う場合は、
+> `implementation("expo.modules.brownfield:expo.modules.brownfield:57.0.14")` の追加が必要です。
 > `expo-brownfield` 本体は AAR の Gradle module metadata 上 **runtime スコープ**でしか
-> 依存に含まれないため、`BrownfieldMessaging` を import するには上記のように
-> 明示的に依存を足す必要があります（`local-repo/` に一緒に publish されています）。
+> 依存に含まれないためです（`local-repo/` に一緒に publish されています）。
+> 本サンプルは bridge をライブラリ側に持たせているので、この依存は不要になりました。
 
 RN 画面は `BrownfieldActivity` を継承した Activity で表示します。
 最短の書き方は `showReactNativeFragment()` の 1 行ですが、
@@ -343,7 +405,7 @@ class RepoSearchActivity : BrownfieldActivity() {
 ### 6-3. 検索結果を受け取る
 
 iOS と同じ形で、`BrownfieldMessaging` を
-[`RepoSearchBridge`](android-host/app/src/main/java/com/example/sampleexpobrownfield/host/RepoSearchBridge.kt)
+[`RepoSearchBridge`](expo-app/native/android/RepoSearchBridge.kt)
 が型付きイベントに変換し、**listener（delegate 相当）とラムダの両方**に流します。
 Compose 画面が listener 版、`RepoSearchActivity` の Toast がラムダ版です。
 

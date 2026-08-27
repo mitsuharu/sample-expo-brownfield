@@ -1,12 +1,11 @@
 import Foundation
-import RepoSearchKit
 
 /// One repository as it arrives from the React Native screen.
-struct SearchedRepository: Identifiable, Hashable {
-  let id: Int
-  let fullName: String
-  let stars: Int
-  let language: String?
+public struct SearchedRepository: Identifiable, Hashable {
+  public let id: Int
+  public let fullName: String
+  public let stars: Int
+  public let language: String?
 
   init?(json: [String: Any]) {
     guard let id = Self.int(json["id"]), let fullName = json["fullName"] as? String else {
@@ -28,25 +27,30 @@ struct SearchedRepository: Identifiable, Hashable {
 }
 
 /// What the React Native screen reports back. Mirrors `src/native/bridge.ts`.
-enum RepoSearchEvent {
+public enum RepoSearchEvent {
   case succeeded(keyword: String, repositories: [SearchedRepository])
   case failed(keyword: String, message: String)
 }
 
-protocol RepoSearchBridgeDelegate: AnyObject {
+public protocol RepoSearchBridgeDelegate: AnyObject {
   func repoSearchBridge(_ bridge: RepoSearchBridge, didReceive event: RepoSearchEvent)
 }
 
-/// Wraps `BrownfieldMessaging` — the raw `[String: Any?]` channel exposed by the
-/// generated brownfield framework — into typed Swift events, delivered on the main
-/// queue through either a delegate or a closure.
-final class RepoSearchBridge {
-  weak var delegate: RepoSearchBridgeDelegate?
-  var onEvent: ((RepoSearchEvent) -> Void)?
+/// Turns the raw `[String: Any?]` messaging channel into typed events, delivered
+/// on the main queue through either a delegate or a closure.
+///
+/// This lives inside the brownfield framework so host apps never have to know
+/// the wire format: they import the framework and consume `RepoSearchEvent`.
+public final class RepoSearchBridge {
+  public weak var delegate: RepoSearchBridgeDelegate?
+  public var onEvent: ((RepoSearchEvent) -> Void)?
 
   private var listenerID: String?
 
-  init(delegate: RepoSearchBridgeDelegate? = nil, onEvent: ((RepoSearchEvent) -> Void)? = nil) {
+  public init(
+    delegate: RepoSearchBridgeDelegate? = nil,
+    onEvent: ((RepoSearchEvent) -> Void)? = nil
+  ) {
     self.delegate = delegate
     self.onEvent = onEvent
   }
@@ -55,14 +59,14 @@ final class RepoSearchBridge {
     stop()
   }
 
-  func start() {
+  public func start() {
     guard listenerID == nil else { return }
     listenerID = BrownfieldMessaging.addListener { [weak self] message in
       self?.handle(message)
     }
   }
 
-  func stop() {
+  public func stop() {
     guard let listenerID else { return }
     BrownfieldMessaging.removeListener(id: listenerID)
     self.listenerID = nil
@@ -100,7 +104,7 @@ final class RepoSearchBridge {
     case "searchFailed":
       return .failed(keyword: keyword, message: message["message"] as? String ?? "unknown error")
     default:
-      // Messages this screen doesn't care about.
+      // Messages this bridge doesn't care about.
       return nil
     }
   }

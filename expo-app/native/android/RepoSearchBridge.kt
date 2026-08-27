@@ -1,4 +1,4 @@
-package com.example.sampleexpobrownfield.host
+package com.example.sampleexpobrownfield.reposearchkit
 
 import android.os.Handler
 import android.os.Looper
@@ -26,9 +26,11 @@ fun interface RepoSearchListener {
 }
 
 /**
- * Wraps `BrownfieldMessaging` — the raw `Map<String, Any?>` channel exposed by the
- * brownfield library — into typed events, delivered on the main thread through
- * either a listener or a lambda.
+ * Wraps `BrownfieldMessaging` — the raw `Map<String, Any?>` channel — into typed
+ * events, delivered on the main thread through either a listener or a lambda.
+ *
+ * This lives inside the brownfield library so host apps never have to know the
+ * wire format: they depend on the AAR and consume `RepoSearchEvent`.
  *
  * Listeners are global rather than lifecycle-bound, so registering in `onCreate`
  * and releasing in `onDestroy` keeps messages flowing while the React Native

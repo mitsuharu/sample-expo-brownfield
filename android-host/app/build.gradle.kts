@@ -38,11 +38,6 @@ dependencies {
   // expo-brownfield plugin config (group : libraryName : version).
   implementation("com.example.sampleexpobrownfield:reposearchkit:1.0.0")
 
-  // expo-brownfield itself (BrownfieldMessaging / BrownfieldState) reaches the
-  // app only as a *runtime* dependency of the library above, so it has to be
-  // declared explicitly to be usable at compile time.
-  implementation("expo.modules.brownfield:expo.modules.brownfield:57.0.14")
-
   // BrownfieldActivity extends AppCompatActivity, and the React Native view is
   // hosted through a Fragment, so the host app provides both.
   implementation("androidx.appcompat:appcompat:1.7.0")

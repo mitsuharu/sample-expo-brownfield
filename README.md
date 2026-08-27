@@ -250,7 +250,7 @@ bridge.start()
 `ios/` `android/` は `expo prebuild` で毎回作り直されるので、手で追加したファイルは消えます。
 そこで自前の config plugin
 [`plugins/withRepoSearchBridge.js`](expo-app/plugins/withRepoSearchBridge.js) が、
-`native/` 以下のソースを prebuild のたびに各ターゲットへ配置します。
+`native/` 以下のソースを、prebuild のたびに各ターゲットから**直接参照するよう設定**します。
 
 ```json
 [
@@ -322,8 +322,28 @@ React Native ランタイムを立ち上げずに型変換とイベント配信�
 Metro に影響しないようテスト専用の Babel 設定 `jest.babel.config.js` を置いています。
 また `@testing-library/react-native` v14 では `render` が **async** になっている点に注意してください。
 
-なお `native/` のソース自体はどのプロジェクトにも属さないため、
-IDE で開けるのは prebuild でコピーされた側です。編集は `native/` 側で行ってください。
+#### `native/` の編集について
+
+生成先にファイルはコピーされません。**実体は `native/` の 1 つだけ**で、
+生成されたプロジェクトがそこを参照します。
+
+```
+# iOS: pbxproj のファイル参照が SOURCE_ROOT（= ios/）からの相対パスで native/ を指す
+path = "../native/ios/RepoSearchBridge.swift"; sourceTree = SOURCE_ROOT;
+
+# Android: ライブラリモジュールのソースセットに native/ を足す
+sourceSets { getByName("main") { java.srcDir("../../native/android") } }
+```
+
+Xcode / Android Studio 上ではターゲットのメンバーとして通常どおり表示され、
+編集・保存すると `native/` の実体がそのまま更新されます。
+複製が存在しないので、「生成先を編集してしまい prebuild で失われる」事故は起こりません。
+
+> **シンボリックリンクでは解決しません。**
+> Xcode の保存は `FileManager.replaceItem(at:withItemAt:)` を経由しますが、
+> この API はシンボリックリンクを元ファイルとして受け付けず、
+> `The document "..." could not be saved. The file doesn't exist.` で失敗します。
+> リンクにすると IDE から編集できなくなります。
 
 ### API 一覧
 

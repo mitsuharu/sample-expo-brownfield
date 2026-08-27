@@ -14,7 +14,10 @@ final class RepoSearchBridgeTests: XCTestCase {
     stars: Any? = 51_842.0,
     language: Any? = "TypeScript"
   ) -> [String: Any] {
-    ["id": id as Any, "fullName": fullName as Any, "stars": stars as Any, "language": language as Any]
+    [
+      "id": id as Any, "fullName": fullName as Any, "stars": stars as Any,
+      "language": language as Any,
+    ]
   }
 
   private func event(
@@ -37,7 +40,7 @@ final class RepoSearchBridgeTests: XCTestCase {
   func testDecodesRepositories() throws {
     let event = try XCTUnwrap(event(for: succeeded([repository()])))
 
-    guard case let .succeeded(keyword, repositories) = event else {
+    guard case .succeeded(let keyword, let repositories) = event else {
       return XCTFail("expected .succeeded, got \(event)")
     }
     XCTAssertEqual(keyword, "expo")
@@ -52,7 +55,7 @@ final class RepoSearchBridgeTests: XCTestCase {
     // Numbers cross the bridge as Double, but an Int must not break decoding.
     let event = try XCTUnwrap(event(for: succeeded([repository(id: 7, stars: 3)])))
 
-    guard case let .succeeded(_, repositories) = event else {
+    guard case .succeeded(_, let repositories) = event else {
       return XCTFail("expected .succeeded, got \(event)")
     }
     XCTAssertEqual(repositories[0].id, 7)
@@ -63,7 +66,7 @@ final class RepoSearchBridgeTests: XCTestCase {
     // The JS side sends "" rather than null, which Android cannot bridge.
     let event = try XCTUnwrap(event(for: succeeded([repository(language: "")])))
 
-    guard case let .succeeded(_, repositories) = event else {
+    guard case .succeeded(_, let repositories) = event else {
       return XCTFail("expected .succeeded, got \(event)")
     }
     XCTAssertNil(repositories[0].language)
@@ -74,7 +77,7 @@ final class RepoSearchBridgeTests: XCTestCase {
       event(for: succeeded([repository(), repository(id: nil), repository(fullName: nil), "junk"]))
     )
 
-    guard case let .succeeded(_, repositories) = event else {
+    guard case .succeeded(_, let repositories) = event else {
       return XCTFail("expected .succeeded, got \(event)")
     }
     XCTAssertEqual(repositories.count, 1)
@@ -85,7 +88,7 @@ final class RepoSearchBridgeTests: XCTestCase {
     json.removeValue(forKey: "stars")
     let event = try XCTUnwrap(event(for: succeeded([json])))
 
-    guard case let .succeeded(_, repositories) = event else {
+    guard case .succeeded(_, let repositories) = event else {
       return XCTFail("expected .succeeded, got \(event)")
     }
     XCTAssertEqual(repositories[0].stars, 0)
@@ -96,7 +99,7 @@ final class RepoSearchBridgeTests: XCTestCase {
       event(for: ["type": "searchFailed", "keyword": "expo", "message": "API rate limit exceeded"])
     )
 
-    guard case let .failed(keyword, message) = event else {
+    guard case .failed(let keyword, let message) = event else {
       return XCTFail("expected .failed, got \(event)")
     }
     XCTAssertEqual(keyword, "expo")

@@ -43,9 +43,8 @@
           },
           "android": {
             "libraryName": "reposearchkit",
-            "packageName": "com.example.sampleexpobrownfield.reposearchkit",
-            "sources": [
-              "native/android/RepoSearchBridge.kt"
+            "sourceDirs": [
+              "native/android"
             ]
           }
         }

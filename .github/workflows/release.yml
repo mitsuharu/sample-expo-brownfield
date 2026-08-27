@@ -1,0 +1,148 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Tag to build and release
+        required: true
+
+permissions:
+  contents: write
+
+env:
+  TAG: ${{ github.event.inputs.tag || github.ref_name }}
+
+jobs:
+  ios:
+    name: iOS artifacts
+    runs-on: macos-15
+    timeout-minutes: 120
+    env:
+      LANG: en_US.UTF-8
+      LC_ALL: en_US.UTF-8
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.tag || github.ref }}
+
+      - uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: expo-app/package-lock.json
+
+      - name: Install dependencies
+        working-directory: expo-app
+        run: npm ci
+
+      - name: Generate the native project
+        working-directory: expo-app
+        run: npm run prebuild:ios
+
+      # Swift Package: one aggregate library the host app adds as a local
+      # package. This is the form the sample itself consumes.
+      - name: Build the Swift Package
+        working-directory: expo-app
+        run: npm run brownfield:ios
+
+      # Plain xcframeworks, for host apps that wire the binaries up
+      # themselves rather than going through SPM. Written to a separate
+      # artifacts directory so the two outputs do not overwrite each other.
+      - name: Build the plain xcframeworks
+        working-directory: expo-app
+        run: npx expo-brownfield build:ios --release --artifacts ./artifacts-xcframeworks
+
+      - name: Package
+        working-directory: expo-app
+        run: |
+          mkdir -p ../dist
+          ditto -c -k --keepParent --sequesterRsrc \
+            artifacts/RepoSearchKitPackage-release \
+            "../dist/RepoSearchKitPackage-${TAG}-spm.zip"
+          ditto -c -k --keepParent --sequesterRsrc \
+            artifacts-xcframeworks \
+            "../dist/RepoSearchKit-${TAG}-xcframeworks.zip"
+          ls -lh ../dist
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ios
+          path: dist/*.zip
+          retention-days: 1
+
+  android:
+    name: Android artifacts
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.tag || github.ref }}
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - uses: android-actions/setup-android@v3
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: expo-app/package-lock.json
+
+      - name: Install dependencies
+        working-directory: expo-app
+        run: npm ci
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Generate the native project
+        working-directory: expo-app
+        run: npm run prebuild:android
+
+      - name: Build and publish the AAR
+        working-directory: expo-app
+        run: npm run brownfield:android
+
+      # The whole Maven layout, not just the AAR: consumers need the POM and
+      # the Gradle module metadata to resolve react-android and hermes-android.
+      - name: Package
+        run: |
+          mkdir -p dist
+          (cd android-host && zip -qr "../dist/reposearchkit-${TAG}-maven-repo.zip" local-repo)
+          find android-host/local-repo -name '*.aar' -path '*reposearchkit*' \
+            -exec cp {} "dist/reposearchkit-${TAG}.aar" \;
+          ls -lh dist
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: android
+          path: dist/*
+          retention-days: 1
+
+  release:
+    name: Publish the release
+    needs: [ios, android]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - run: ls -lh dist
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.inputs.tag || github.ref_name }}
+          generate_release_notes: true
+          files: dist/*

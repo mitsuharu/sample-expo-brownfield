@@ -1,0 +1,129 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+# A new push supersedes the previous run. macOS runners bill at 10x, so
+# letting stale runs finish is expensive.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  expo-app:
+    name: expo-app
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: expo-app
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: expo-app/package-lock.json
+
+      # Also applies patches/ through the postinstall hook.
+      - run: npm ci
+
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm test
+
+  ios:
+    name: iOS
+    runs-on: macos-15
+    timeout-minutes: 90
+    env:
+      # CocoaPods fails with "Unicode Normalization not appropriate for
+      # ASCII-8BIT" when the locale is unset.
+      LANG: en_US.UTF-8
+      LC_ALL: en_US.UTF-8
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: expo-app/package-lock.json
+
+      - name: Install dependencies
+        working-directory: expo-app
+        run: npm ci
+
+      - name: Lint Swift
+        run: ./scripts/swift-format.sh
+
+      - name: Generate the native project
+        working-directory: expo-app
+        run: npm run prebuild:ios
+
+      # The brownfield framework is what the host app links against, so it has
+      # to be built before the host app can be tested.
+      - name: Build the xcframework
+        working-directory: expo-app
+        run: npm run brownfield:ios
+
+      - name: Generate the host app project
+        working-directory: ios-host
+        run: |
+          brew install xcodegen
+          xcodegen generate
+
+      - name: Test the host app
+        working-directory: ios-host
+        run: |
+          xcodebuild test \
+            -project HostApp.xcodeproj \
+            -scheme HostApp \
+            -destination 'platform=iOS Simulator,name=iPhone 16' \
+            CODE_SIGNING_ALLOWED=NO
+
+  android:
+    name: Android
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - uses: android-actions/setup-android@v3
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: expo-app/package-lock.json
+
+      - name: Install dependencies
+        working-directory: expo-app
+        run: npm ci
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Generate the native project
+        working-directory: expo-app
+        run: npm run prebuild:android
+
+      # Publishes the AAR into android-host/local-repo, which the host app
+      # resolves its dependency from.
+      - name: Build and publish the AAR
+        working-directory: expo-app
+        run: npm run brownfield:android
+
+      - name: Test the host app
+        working-directory: android-host
+        run: ./gradlew testDebugUnitTest

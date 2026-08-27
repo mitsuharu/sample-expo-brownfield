@@ -611,6 +611,48 @@ Swift に SwiftLint ではなく swift-format を使っているのは、**Xcode
 
 Kotlin には lint を入れていません（必要なら ktlint / detekt が候補です）。
 
+## CI / リリース
+
+[`.github/workflows/`](.github/workflows) に 2 つのワークフローがあります。
+
+### CI（`ci.yml`）
+
+Pull Request と `main` への push で走ります。
+
+| ジョブ | ランナー | 内容 |
+| --- | --- | --- |
+| `expo-app` | ubuntu | `npm run lint` / `typecheck` / `test` |
+| `iOS` | macOS | swift-format の検査 → prebuild → xcframework のビルド → ホストアプリのテスト |
+| `Android` | ubuntu | prebuild → AAR のビルドと publish → ホストアプリのテスト |
+
+ホストアプリのテストは**成果物に依存する**ため、ジョブ内で先に xcframework / AAR を
+作ってから実行します。ここが通れば「ビルドできて、かつ組み込んだ状態で動く」ことの確認になります。
+
+> **macOS ランナーは分単位課金が 10 倍**です。private リポジトリでは iOS ジョブ 1 回で
+> 数百分の割り当てを消費し得ます。無駄な実行を減らすため、同一ブランチの古い実行は
+> `concurrency` で自動キャンセルしています。それでも費用が気になる場合は、
+> iOS / Android のジョブに `paths` フィルタを付けて、
+> 関係するファイルが変わったときだけ走らせる方法があります。
+
+### リリース（`release.yml`）
+
+`v` で始まるタグを push すると走ります（`workflow_dispatch` で手動実行も可能）。
+成果物を GitHub Release に添付します。
+
+| ファイル | 内容 |
+| --- | --- |
+| `RepoSearchKitPackage-<tag>-spm.zip` | Swift Package 形式。Xcode の **Add Local** で追加する。本サンプルが使っている形 |
+| `RepoSearchKit-<tag>-xcframeworks.zip` | 素の xcframework 10 個。SPM を経由せず自前で組み込む場合はこちら |
+| `reposearchkit-<tag>-maven-repo.zip` | Maven リポジトリ一式。POM と Gradle module metadata を含む |
+| `reposearchkit-<tag>.aar` | AAR 単体 |
+
+Android は AAR 単体だけでなくリポジトリ一式も添付しています。
+`react-android` と `hermes-android` のバージョンは Gradle module metadata で解決されるため、
+AAR だけでは依存を引けないからです。
+
+> iOS の成果物は圧縮後でも数百 MB になります（xcframework に全アーキテクチャの
+> React Native と Hermes が入るため）。
+
 ## 動作確認の状況
 
 iOS / Android とも、**ネイティブ → RN への検索ワード受け渡し**、**RN → ネイティブへの結果通知（20 件）**、

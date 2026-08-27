@@ -1,4 +1,4 @@
-package com.example.sampleexpobrownfield.reposearchkit
+package com.example.sample.expo.brownfield.reposearchkit
 
 import android.os.Handler
 import android.os.Looper

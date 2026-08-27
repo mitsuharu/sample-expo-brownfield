@@ -1,16 +1,16 @@
-package com.example.sampleexpobrownfield.host
+package com.example.sample.expo.brownfield.host
 
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
 import android.widget.Toast
 import androidx.core.os.bundleOf
-import com.example.sampleexpobrownfield.reposearchkit.BrownfieldActivity
-import com.example.sampleexpobrownfield.reposearchkit.RepoSearchBridge
-import com.example.sampleexpobrownfield.reposearchkit.RepoSearchEvent
-import com.example.sampleexpobrownfield.reposearchkit.ReactNativeHostManager
-import com.example.sampleexpobrownfield.reposearchkit.ReactNativeViewFactory
-import com.example.sampleexpobrownfield.reposearchkit.setUpNativeBackHandling
+import com.example.sample.expo.brownfield.reposearchkit.BrownfieldActivity
+import com.example.sample.expo.brownfield.reposearchkit.RepoSearchBridge
+import com.example.sample.expo.brownfield.reposearchkit.RepoSearchEvent
+import com.example.sample.expo.brownfield.reposearchkit.ReactNativeHostManager
+import com.example.sample.expo.brownfield.reposearchkit.ReactNativeViewFactory
+import com.example.sample.expo.brownfield.reposearchkit.setUpNativeBackHandling
 
 /**
  * Hosts the React Native screen.

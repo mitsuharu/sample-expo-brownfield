@@ -77,7 +77,7 @@ cd expo-app && npm run prebuild:ios
 [
   "expo-brownfield",
   {
-    "ios": { "targetName": "RepoSearchKit", "bundleIdentifier": "com.example.sampleexpobrownfield.reposearchkit" },
+    "ios": { "targetName": "RepoSearchKit", "bundleIdentifier": "com.example.sample.expo.brownfield.reposearchkit" },
     "android": { "library": "reposearchkit" }
   }
 ]
@@ -257,19 +257,15 @@ bridge.start()
   "./plugins/withRepoSearchBridge",
   {
     "ios": { "targetName": "RepoSearchKit", "sources": ["native/ios/RepoSearchBridge.swift"] },
-    "android": {
-      "libraryName": "reposearchkit",
-      "packageName": "com.example.sampleexpobrownfield.reposearchkit",
-      "sources": ["native/android/RepoSearchBridge.kt"]
-    }
+    "android": { "libraryName": "reposearchkit", "sourceDirs": ["native/android"] }
   }
 ]
 ```
 
-**Android は簡単です。** Gradle がディレクトリ規約でソースを拾うので、
-`android/<libraryName>/src/main/java/<package>/` にコピーするだけで済みます
-（`withDangerousMod`）。プロジェクトファイルをいじる必要も、
-expo-brownfield との実行順を気にする必要もありません。
+**Android は簡単です。** ライブラリモジュールのソースセットに `srcDir` を足すだけで済みます。
+ただしパッチを当てる `build.gradle.kts` は expo-brownfield が manifest mod で生成するため、
+こちらも manifest mod で行う必要があります（Android では dangerous mod が先に走るので、
+そこでパッチすると生成物に上書きされます）。
 
 **iOS は Xcode プロジェクトへの登録が必要**で、ここに落とし穴が集中しています。
 
@@ -373,8 +369,8 @@ npm run brownfield:android    # expo-brownfield build:android --release
 ```json
 "android": {
   "libraryName": "reposearchkit",
-  "package": "com.example.sampleexpobrownfield.reposearchkit",
-  "group": "com.example.sampleexpobrownfield",
+  "package": "com.example.sample.expo.brownfield.reposearchkit",
+  "group": "com.example.sample.expo.brownfield",
   "version": "1.0.1",
   "publishing": [
     { "type": "localDirectory", "name": "hostAppRepo", "path": "../android-host/local-repo" }
@@ -408,7 +404,7 @@ dependencyResolutionManagement {
 }
 
 // app/build.gradle.kts — group : libraryName : version
-implementation("com.example.sampleexpobrownfield:reposearchkit:1.0.1")
+implementation("com.example.sample.expo.brownfield:reposearchkit:1.0.1")
 ```
 
 > ホストアプリから `BrownfieldMessaging` を直接使う場合は、

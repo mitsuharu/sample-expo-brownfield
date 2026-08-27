@@ -24,6 +24,7 @@
     "typecheck": "tsc --noEmit",
     "prebuild": "expo prebuild --clean",
     "prebuild:ios": "expo prebuild --platform ios --clean",
+    "prebuild:android": "expo prebuild --platform android",
     "brownfield:ios": "expo-brownfield build:ios --release --package RepoSearchKitPackage",
     "brownfield:ios:debug": "expo-brownfield build:ios --debug --package RepoSearchKitPackage",
     "brownfield:ios:xcframeworks": "expo-brownfield build:ios --release",

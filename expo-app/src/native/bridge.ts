@@ -20,11 +20,25 @@ export const MessageType = {
   searchFailed: 'searchFailed',
 } as const;
 
+/**
+ * Android の `sendMessage` は入れ子になった `null` を Kotlin の型に変換できず
+ * `Cannot convert '[object Object]' to a Kotlin type. Value is null` で失敗する。
+ * ネイティブが使うフィールドだけに絞り、`null` になりうる値は空文字に落として送る。
+ */
+function toPayload(repository: Repository) {
+  return {
+    id: repository.id,
+    fullName: repository.fullName,
+    stars: repository.stars,
+    language: repository.language ?? '',
+  };
+}
+
 export function notifySearchSucceeded(keyword: string, repositories: Repository[]) {
   sendMessage({
     type: MessageType.searchSucceeded,
     keyword,
-    repositories,
+    repositories: repositories.map(toPayload),
   });
 }
 

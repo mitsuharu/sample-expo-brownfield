@@ -15,7 +15,8 @@ struct SearchedRepository: Identifiable, Hashable {
     self.id = id
     self.fullName = fullName
     self.stars = Self.int(json["stars"]) ?? 0
-    self.language = json["language"] as? String
+    // The JS side sends "" instead of null (see src/native/bridge.ts).
+    self.language = (json["language"] as? String).flatMap { $0.isEmpty ? nil : $0 }
   }
 
   /// Every JS number crosses the bridge as a `Double`, so `as? Int` alone never matches.

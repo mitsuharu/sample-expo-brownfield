@@ -26,10 +26,19 @@ runs:
         sh /tmp/install-safe-chain.sh --ci
         rm /tmp/install-safe-chain.sh
 
-    # Prints which npm later steps will actually run, so an inactive shim shows
-    # up in the log instead of silently leaving the install unscreened.
-    - name: Report the active npm
+    # actions/setup-node also prepends to GITHUB_PATH, so whichever runs last
+    # wins. Fail loudly rather than leave the install silently unscreened.
+    - name: Verify the shim is active
       shell: bash
       run: |
-        echo "npm resolves to: $(command -v npm)"
+        set -euo pipefail
+        resolved="$(command -v npm)"
+        echo "npm resolves to: $resolved"
+        case "$resolved" in
+          *safe-chain*) ;;
+          *)
+            echo "::error::npm does not resolve to a Safe Chain shim. Move this action after actions/setup-node."
+            exit 1
+            ;;
+        esac
         npm --version

@@ -23,8 +23,39 @@ updates:
       - dependency-name: react-native
       - dependency-name: react
       - dependency-name: react-dom
+    # A dependency lands in the first group it matches, so the narrow groups
+    # come before the catch-all ones.
+    groups:
+      jest:
+        patterns:
+          - jest
+          - jest-*
+          - '@types/jest'
+          - '@react-native/jest-preset'
+      testing-library:
+        patterns: ['@testing-library/*']
+      biome:
+        patterns: ['@biomejs/*']
+      babel:
+        patterns:
+          - babel-preset-expo
+          - '@babel/*'
+      typescript:
+        patterns:
+          - typescript
+          - '@types/*'
 
   - package-ecosystem: gradle
     directory: /android-host
     schedule:
       interval: weekly
+    groups:
+      test:
+        patterns:
+          - junit:*
+          - org.robolectric:*
+          - androidx.test:*
+      compose:
+        patterns: ['androidx.compose*']
+      androidx:
+        patterns: ['androidx.*']

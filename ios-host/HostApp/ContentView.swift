@@ -26,11 +26,11 @@ final class SearchResultsStore: ObservableObject, RepoSearchBridgeDelegate {
 
   func repoSearchBridge(_ bridge: RepoSearchBridge, didReceive event: RepoSearchEvent) {
     switch event {
-    case let .succeeded(keyword, repositories):
+    case .succeeded(let keyword, let repositories):
       self.lastKeyword = keyword
       self.repositories = repositories
       self.errorMessage = nil
-    case let .failed(keyword, message):
+    case .failed(let keyword, let message):
       self.lastKeyword = keyword
       self.repositories = []
       self.errorMessage = message
@@ -108,9 +108,9 @@ final class SearchStatusModel: ObservableObject {
   private lazy var bridge: RepoSearchBridge = {
     RepoSearchBridge { [weak self] event in
       switch event {
-      case let .succeeded(keyword, repositories):
+      case .succeeded(let keyword, let repositories):
         self?.status = "\(keyword): \(repositories.count) 件受信"
-      case let .failed(keyword, _):
+      case .failed(let keyword, _):
         self?.status = "\(keyword): 取得失敗"
       }
     }

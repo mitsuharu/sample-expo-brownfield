@@ -1,7 +1,7 @@
-import { StatusBar } from 'expo-status-bar';
+import { StatusBar } from 'expo-status-bar'
 
-import { DEFAULT_KEYWORD, type RootProps } from './src/native/bridge';
-import { RepoSearchScreen } from './src/screens/RepoSearchScreen';
+import { DEFAULT_KEYWORD, type RootProps } from './src/native/bridge'
+import { RepoSearchScreen } from './src/screens/RepoSearchScreen'
 
 /**
  * `keyword` comes from the native host app via `initialProps`, e.g.
@@ -14,5 +14,5 @@ export default function App({ keyword }: RootProps) {
       <StatusBar style="dark" />
       <RepoSearchScreen keyword={keyword ?? DEFAULT_KEYWORD} />
     </>
-  );
+  )
 }

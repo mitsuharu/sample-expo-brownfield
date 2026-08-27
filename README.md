@@ -494,6 +494,31 @@ sdk.dir=/Users/<you>/Library/Android/sdk
 > `Unresolved reference` が出るのに AAR の中には確かにそのメソッドがある、という状態になります。
 > `app.json` の `android.version` を上げるのが確実です。
 
+## Lint / フォーマット
+
+| 対象 | ツール | 設定 |
+| --- | --- | --- |
+| TypeScript / JavaScript / JSON / Markdown | [Biome](https://github.com/biomejs/biome) | [`expo-app/biome.json`](expo-app/biome.json) |
+| Swift | swift-format（Xcode 同梱） | [`.swift-format`](.swift-format) |
+
+```bash
+cd expo-app && npm run lint        # 検査のみ
+cd expo-app && npm run lint:fix    # 自動修正
+
+./scripts/swift-format.sh          # 検査のみ
+./scripts/swift-format.sh --fix    # 自動修正
+```
+
+VS Code を使う場合は [`.vscode/extensions.json`](.vscode/extensions.json) の推奨拡張を入れると、
+保存時のフォーマットと import の整理が有効になります。
+
+Swift に SwiftLint ではなく swift-format を使っているのは、**Xcode に同梱されていて
+追加インストールが不要**なためです。本リポジトリは元々 Xcode を要求するので、
+これ以上の前提を増やさずに済みます。ルールは swift-format の既定値をそのまま使い、
+インデントだけ本プロジェクトに合わせています。
+
+Kotlin には lint を入れていません（必要なら ktlint / detekt が候補です）。
+
 ## 動作確認の状況
 
 iOS / Android とも、**ネイティブ → RN への検索ワード受け渡し**、**RN → ネイティブへの結果通知（20 件）**、

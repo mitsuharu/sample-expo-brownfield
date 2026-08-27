@@ -1,10 +1,10 @@
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native'
 
-import type { Repository } from '../api/github';
+import type { Repository } from '../api/github'
 
 type Props = {
-  repository: Repository;
-};
+  repository: Repository
+}
 
 export function RepositoryRow({ repository }: Props) {
   return (
@@ -20,7 +20,7 @@ export function RepositoryRow({ repository }: Props) {
         {repository.language !== null ? ` · ${repository.language}` : ''}
       </Text>
     </View>
-  );
+  )
 }
 
 const styles = StyleSheet.create({
@@ -43,4 +43,4 @@ const styles = StyleSheet.create({
     fontSize: 12,
     marginTop: 6,
   },
-});
+})

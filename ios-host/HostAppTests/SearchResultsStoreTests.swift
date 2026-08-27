@@ -26,13 +26,15 @@ final class SearchResultsStoreTests: XCTestCase {
     var decoded: [SearchedRepository] = []
     let received = expectation(description: "decoded")
     bridge.onEvent = { event in
-      if case let .succeeded(_, repositories) = event { decoded = repositories }
+      if case .succeeded(_, let repositories) = event { decoded = repositories }
       received.fulfill()
     }
     bridge.receive([
       "type": "searchSucceeded",
       "keyword": "expo",
-      "repositories": [["id": 1.0, "fullName": "expo/expo", "stars": 51_842.0, "language": "TypeScript"]],
+      "repositories": [
+        ["id": 1.0, "fullName": "expo/expo", "stars": 51_842.0, "language": "TypeScript"]
+      ],
     ])
     wait(for: [received], timeout: 1)
     return decoded[0]

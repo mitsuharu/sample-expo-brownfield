@@ -3,4 +3,4 @@
 // adding Jest support does not change how the app is bundled.
 module.exports = {
   presets: [['babel-preset-expo', { jsxRuntime: 'automatic' }]],
-};
+}

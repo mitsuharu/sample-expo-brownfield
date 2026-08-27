@@ -1,5 +1,5 @@
-import { popToNative } from 'expo-brownfield';
-import { useCallback, useState } from 'react';
+import { popToNative } from 'expo-brownfield'
+import { useCallback, useState } from 'react'
 import {
   ActivityIndicator,
   FlatList,
@@ -9,39 +9,39 @@ import {
   StyleSheet,
   Text,
   View,
-} from 'react-native';
+} from 'react-native'
 
-import { searchRepositories, type Repository } from '../api/github';
-import { ActionButton } from '../components/ActionButton';
-import { RepositoryRow } from '../components/RepositoryRow';
-import { notifySearchFailed, notifySearchSucceeded } from '../native/bridge';
+import { type Repository, searchRepositories } from '../api/github'
+import { ActionButton } from '../components/ActionButton'
+import { RepositoryRow } from '../components/RepositoryRow'
+import { notifySearchFailed, notifySearchSucceeded } from '../native/bridge'
 
 type Props = {
-  keyword: string;
-};
+  keyword: string
+}
 
 export function RepoSearchScreen({ keyword }: Props) {
-  const [repositories, setRepositories] = useState<Repository[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [repositories, setRepositories] = useState<Repository[]>([])
+  const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   const onPressSearch = useCallback(async () => {
-    setIsLoading(true);
-    setError(null);
+    setIsLoading(true)
+    setError(null)
     try {
-      const results = await searchRepositories(keyword);
-      setRepositories(results);
+      const results = await searchRepositories(keyword)
+      setRepositories(results)
       // Hand the results back to the native host app.
-      notifySearchSucceeded(keyword, results);
+      notifySearchSucceeded(keyword, results)
     } catch (e) {
-      const message = e instanceof Error ? e.message : String(e);
-      setRepositories([]);
-      setError(message);
-      notifySearchFailed(keyword, message);
+      const message = e instanceof Error ? e.message : String(e)
+      setRepositories([])
+      setError(message)
+      notifySearchFailed(keyword, message)
     } finally {
-      setIsLoading(false);
+      setIsLoading(false)
     }
-  }, [keyword]);
+  }, [keyword])
 
   return (
     <SafeAreaView style={styles.container}>
@@ -57,7 +57,11 @@ export function RepoSearchScreen({ keyword }: Props) {
           onPress={onPressSearch}
         />
         {/* Only has an effect when this screen is embedded in a native host app. */}
-        <ActionButton label="ネイティブに戻る" onPress={() => popToNative(true)} variant="secondary" />
+        <ActionButton
+          label="ネイティブに戻る"
+          onPress={() => popToNative(true)}
+          variant="secondary"
+        />
       </View>
 
       {error !== null && <Text style={styles.error}>{error}</Text>}
@@ -71,14 +75,16 @@ export function RepoSearchScreen({ keyword }: Props) {
           keyExtractor={(item) => String(item.id)}
           ListEmptyComponent={
             error === null ? (
-              <Text style={styles.empty}>ボタンを押すと検索結果が表示されます。</Text>
+              <Text style={styles.empty}>
+                ボタンを押すと検索結果が表示されます。
+              </Text>
             ) : null
           }
           renderItem={({ item }) => <RepositoryRow repository={item} />}
         />
       )}
     </SafeAreaView>
-  );
+  )
 }
 
 const styles = StyleSheet.create({
@@ -125,4 +131,4 @@ const styles = StyleSheet.create({
     marginTop: 32,
     textAlign: 'center',
   },
-});
+})

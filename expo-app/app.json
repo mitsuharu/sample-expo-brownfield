@@ -37,15 +37,11 @@
         {
           "ios": {
             "targetName": "RepoSearchKit",
-            "sources": [
-              "native/ios/RepoSearchBridge.swift"
-            ]
+            "sources": ["native/ios/RepoSearchBridge.swift"]
           },
           "android": {
             "libraryName": "reposearchkit",
-            "sourceDirs": [
-              "native/android"
-            ]
+            "sourceDirs": ["native/android"]
           }
         }
       ],

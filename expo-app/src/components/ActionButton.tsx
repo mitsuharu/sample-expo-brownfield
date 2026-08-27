@@ -1,14 +1,19 @@
-import { Pressable, StyleSheet, Text } from 'react-native';
+import { Pressable, StyleSheet, Text } from 'react-native'
 
 type Props = {
-  label: string;
-  onPress: () => void;
-  disabled?: boolean;
-  variant?: 'primary' | 'secondary';
-};
+  label: string
+  onPress: () => void
+  disabled?: boolean
+  variant?: 'primary' | 'secondary'
+}
 
-export function ActionButton({ label, onPress, disabled = false, variant = 'primary' }: Props) {
-  const isSecondary = variant === 'secondary';
+export function ActionButton({
+  label,
+  onPress,
+  disabled = false,
+  variant = 'primary',
+}: Props) {
+  const isSecondary = variant === 'secondary'
 
   return (
     <Pressable
@@ -20,10 +25,13 @@ export function ActionButton({ label, onPress, disabled = false, variant = 'prim
         isSecondary && styles.secondary,
         disabled && styles.disabled,
         pressed && styles.pressed,
-      ]}>
-      <Text style={[styles.label, isSecondary && styles.secondaryLabel]}>{label}</Text>
+      ]}
+    >
+      <Text style={[styles.label, isSecondary && styles.secondaryLabel]}>
+        {label}
+      </Text>
     </Pressable>
-  );
+  )
 }
 
 const styles = StyleSheet.create({
@@ -53,4 +61,4 @@ const styles = StyleSheet.create({
   secondaryLabel: {
     color: '#111827',
   },
-});
+})

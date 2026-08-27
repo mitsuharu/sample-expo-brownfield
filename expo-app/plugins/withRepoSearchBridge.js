@@ -1,6 +1,6 @@
-const { withAndroidManifest, withXcodeProject } = require('expo/config-plugins');
-const fs = require('node:fs');
-const path = require('node:path');
+const { withAndroidManifest, withXcodeProject } = require('expo/config-plugins')
+const fs = require('node:fs')
+const path = require('node:path')
 
 /**
  * Ships our own native sources inside the brownfield artifacts, so the typed
@@ -14,7 +14,8 @@ const path = require('node:path');
  */
 
 /** pbxproj stores names quoted (`"RepoSearchKit"`), so compare unquoted. */
-const unquote = (value) => (typeof value === 'string' ? value.replace(/^"|"$/g, '') : value);
+const unquote = (value) =>
+  typeof value === 'string' ? value.replace(/^"|"$/g, '') : value
 
 /**
  * Adds the sources to the framework target as references to `native/`.
@@ -26,38 +27,41 @@ const unquote = (value) => (typeof value === 'string' ? value.replace(/^"|"$/g, 
  */
 const withIosSources = (config, { targetName, sources }) => {
   return withXcodeProject(config, (config) => {
-    const project = config.modResults;
-    const projectRoot = config.modRequest.projectRoot;
+    const project = config.modResults
+    const projectRoot = config.modRequest.projectRoot
 
     const target = Object.entries(project.pbxNativeTargetSection()).find(
-      ([key, value]) => !key.endsWith('_comment') && unquote(value.name) === targetName
-    );
+      ([key, value]) =>
+        !key.endsWith('_comment') && unquote(value.name) === targetName,
+    )
     if (!target) {
       throw new Error(
-        `expo-brownfield target "${targetName}" not found. Is withRepoSearchBridge listed before expo-brownfield in app.json?`
-      );
+        `expo-brownfield target "${targetName}" not found. Is withRepoSearchBridge listed before expo-brownfield in app.json?`,
+      )
     }
-    const [targetUuid] = target;
+    const [targetUuid] = target
 
     const groupKey =
       project.findPBXGroupKey({ name: targetName }) ??
-      project.findPBXGroupKey({ name: `"${targetName}"` });
+      project.findPBXGroupKey({ name: `"${targetName}"` })
     if (!groupKey) {
-      throw new Error(`Xcode group "${targetName}" not found.`);
+      throw new Error(`Xcode group "${targetName}" not found.`)
     }
 
     // The framework target's compile-sources phase is registered under the
     // target name rather than the usual "Sources" comment, so
     // `addSourceFile()` cannot find it and would silently attach the file to
     // the app target instead. Resolve the phase from the target itself.
-    const sourcesSection = project.hash.project.objects.PBXSourcesBuildPhase;
-    const phaseRef = (project.pbxNativeTargetSection()[targetUuid].buildPhases ?? []).find(
-      (phase) => sourcesSection[phase.value] !== undefined
-    );
+    const sourcesSection = project.hash.project.objects.PBXSourcesBuildPhase
+    const phaseRef = (
+      project.pbxNativeTargetSection()[targetUuid].buildPhases ?? []
+    ).find((phase) => sourcesSection[phase.value] !== undefined)
     if (!phaseRef) {
-      throw new Error(`No compile-sources build phase on target "${targetName}".`);
+      throw new Error(
+        `No compile-sources build phase on target "${targetName}".`,
+      )
     }
-    const sourcesPhase = sourcesSection[phaseRef.value];
+    const sourcesPhase = sourcesSection[phaseRef.value]
 
     for (const source of sources) {
       // Relative to the .xcodeproj's directory, which is what SOURCE_ROOT means.
@@ -65,29 +69,29 @@ const withIosSources = (config, { targetName, sources }) => {
       // Xcode edit the real file.
       const referencePath = path.relative(
         path.join(projectRoot, 'ios'),
-        path.join(projectRoot, source)
-      );
+        path.join(projectRoot, source),
+      )
 
       const file = project.addFile(referencePath, groupKey, {
         target: targetUuid,
         sourceTree: 'SOURCE_ROOT',
-      });
+      })
       if (!file) {
-        throw new Error(`${source} is already referenced by the Xcode project.`);
+        throw new Error(`${source} is already referenced by the Xcode project.`)
       }
 
-      file.uuid = project.generateUuid();
-      file.target = targetUuid;
-      project.addToPbxBuildFileSection(file);
+      file.uuid = project.generateUuid()
+      file.target = targetUuid
+      project.addToPbxBuildFileSection(file)
       sourcesPhase.files.push({
         value: file.uuid,
         comment: `${path.basename(source)} in Sources`,
-      });
+      })
     }
 
-    return config;
-  });
-};
+    return config
+  })
+}
 
 /**
  * Points the library module's Gradle source set at `native/`.
@@ -98,13 +102,13 @@ const withIosSources = (config, { targetName, sources }) => {
  */
 const withAndroidSources = (config, { libraryName, sourceDirs }) => {
   return withAndroidManifest(config, (config) => {
-    const projectRoot = config.modRequest.projectRoot;
-    const modulePath = path.join(projectRoot, 'android', libraryName);
-    const buildGradlePath = path.join(modulePath, 'build.gradle.kts');
+    const projectRoot = config.modRequest.projectRoot
+    const modulePath = path.join(projectRoot, 'android', libraryName)
+    const buildGradlePath = path.join(modulePath, 'build.gradle.kts')
 
     const srcDirs = sourceDirs.map((dir) =>
-      path.relative(modulePath, path.join(projectRoot, dir))
-    );
+      path.relative(modulePath, path.join(projectRoot, dir)),
+    )
     const block = [
       '',
       '  sourceSets {',
@@ -112,32 +116,37 @@ const withAndroidSources = (config, { libraryName, sourceDirs }) => {
       ...srcDirs.map((dir) => `      java.srcDir("${dir}")`),
       '    }',
       '  }',
-    ].join('\n');
+    ].join('\n')
 
-    const contents = fs.readFileSync(buildGradlePath, 'utf8');
+    const contents = fs.readFileSync(buildGradlePath, 'utf8')
     if (contents.includes('sourceSets {')) {
-      return config;
+      return config
     }
 
-    const anchor = '\n  buildFeatures {';
+    const anchor = '\n  buildFeatures {'
     if (!contents.includes(anchor)) {
-      throw new Error(`Could not find an anchor to add sourceSets to ${buildGradlePath}.`);
+      throw new Error(
+        `Could not find an anchor to add sourceSets to ${buildGradlePath}.`,
+      )
     }
 
-    fs.writeFileSync(buildGradlePath, contents.replace(anchor, `${block}\n${anchor}`));
+    fs.writeFileSync(
+      buildGradlePath,
+      contents.replace(anchor, `${block}\n${anchor}`),
+    )
 
-    return config;
-  });
-};
+    return config
+  })
+}
 
 const withRepoSearchBridge = (config, { ios, android }) => {
   if (ios) {
-    config = withIosSources(config, ios);
+    config = withIosSources(config, ios)
   }
   if (android) {
-    config = withAndroidSources(config, android);
+    config = withAndroidSources(config, android)
   }
-  return config;
-};
+  return config
+}
 
-module.exports = withRepoSearchBridge;
+module.exports = withRepoSearchBridge

@@ -1,0 +1,51 @@
+{
+  "files.insertFinalNewline": true,
+  "editor.tabSize": 2,
+  "editor.insertSpaces": true,
+  "editor.detectIndentation": false,
+  "typescript.tsdk": "expo-app/node_modules/typescript/lib",
+  "editor.defaultFormatter": "biomejs.biome",
+  "editor.formatOnSave": true,
+  "editor.codeActionsOnSave": {
+    "source.organizeImports.biome": "explicit"
+  },
+  "[swift]": {
+    "editor.defaultFormatter": "swiftlang.swift-vscode"
+  },
+  "[kotlin]": {
+    "editor.formatOnSave": false
+  },
+  "cSpell.words": [
+    "aars",
+    "AGP",
+    "appmodules",
+    "brownfield",
+    "cmdline",
+    "Codable",
+    "cocoapods",
+    "Emoto",
+    "expo",
+    "gradlew",
+    "hermes",
+    "jbr",
+    "jsbundle",
+    "mavenLocal",
+    "mitsuharu",
+    "ndk",
+    "objc",
+    "podspec",
+    "prebuild",
+    "prebuilds",
+    "pressable",
+    "reposearchkit",
+    "Robolectric",
+    "sourcesets",
+    "swiftinterface",
+    "typecheck",
+    "xcframework",
+    "xcframeworks",
+    "xcodegen",
+    "xcodeproj",
+    "xcworkspace"
+  ]
+}

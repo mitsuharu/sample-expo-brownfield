@@ -5,11 +5,11 @@ plugins {
 }
 
 android {
-  namespace = "com.example.sampleexpobrownfield.host"
+  namespace = "com.example.sample.expo.brownfield.host"
   compileSdk = 36
 
   defaultConfig {
-    applicationId = "com.example.sampleexpobrownfield.host"
+    applicationId = "com.example.sample.expo.brownfield.host"
     minSdk = 24
     targetSdk = 36
     versionCode = 1
@@ -40,7 +40,7 @@ android {
 dependencies {
   // The brownfield library. Coordinates come from `android` in the
   // expo-brownfield plugin config (group : libraryName : version).
-  implementation("com.example.sampleexpobrownfield:reposearchkit:1.0.1")
+  implementation("com.example.sample.expo.brownfield:reposearchkit:1.0.1")
 
   // BrownfieldActivity extends AppCompatActivity, and the React Native view is
   // hosted through a Fragment, so the host app provides both.

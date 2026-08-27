@@ -1,8 +1,8 @@
-package com.example.sampleexpobrownfield.host
+package com.example.sample.expo.brownfield.host
 
-import com.example.sampleexpobrownfield.reposearchkit.RepoSearchBridge
-import com.example.sampleexpobrownfield.reposearchkit.RepoSearchEvent
-import com.example.sampleexpobrownfield.reposearchkit.RepoSearchListener
+import com.example.sample.expo.brownfield.reposearchkit.RepoSearchBridge
+import com.example.sample.expo.brownfield.reposearchkit.RepoSearchEvent
+import com.example.sample.expo.brownfield.reposearchkit.RepoSearchListener
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue

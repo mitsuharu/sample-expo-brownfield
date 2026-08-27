@@ -1,13 +1,13 @@
-package com.example.sampleexpobrownfield.host
+package com.example.sample.expo.brownfield.host
 
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
-import com.example.sampleexpobrownfield.reposearchkit.RepoSearchBridge
-import com.example.sampleexpobrownfield.reposearchkit.RepoSearchEvent
-import com.example.sampleexpobrownfield.reposearchkit.RepoSearchListener
-import com.example.sampleexpobrownfield.reposearchkit.SearchedRepository
+import com.example.sample.expo.brownfield.reposearchkit.RepoSearchBridge
+import com.example.sample.expo.brownfield.reposearchkit.RepoSearchEvent
+import com.example.sample.expo.brownfield.reposearchkit.RepoSearchListener
+import com.example.sample.expo.brownfield.reposearchkit.SearchedRepository
 
 /**
  * Receives search results through the listener form of the bridge.

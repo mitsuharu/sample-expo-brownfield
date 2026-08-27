@@ -1,4 +1,4 @@
-package com.example.sampleexpobrownfield.host
+package com.example.sample.expo.brownfield.host
 
 import android.os.Bundle
 import androidx.activity.ComponentActivity

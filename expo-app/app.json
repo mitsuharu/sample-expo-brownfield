@@ -40,7 +40,17 @@
             "bundleIdentifier": "com.example.sampleexpobrownfield.reposearchkit"
           },
           "android": {
-            "library": "reposearchkit"
+            "libraryName": "reposearchkit",
+            "package": "com.example.sampleexpobrownfield.reposearchkit",
+            "group": "com.example.sampleexpobrownfield",
+            "version": "1.0.0",
+            "publishing": [
+              {
+                "type": "localDirectory",
+                "name": "hostAppRepo",
+                "path": "../android-host/local-repo"
+              }
+            ]
           }
         }
       ]

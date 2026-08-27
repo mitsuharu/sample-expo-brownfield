@@ -19,11 +19,17 @@ sample-expo-brownfield/
 │   │   └── screens/RepoSearchScreen.tsx   # 検索画面の本体
 │   ├── app.json           # expo-brownfield / expo-build-properties プラグイン設定
 │   └── ios/               # `expo prebuild` の生成物（RepoSearchKit ターゲットを含む）
-└── ios-host/     # 生成物を取り込む素の SwiftUI アプリ（XcodeGen でプロジェクト生成）
-    ├── project.yml
-    └── HostApp/
-        ├── ContentView.swift       # 検索ワード入力 + 受信結果の表示
-        └── RepoSearchBridge.swift  # RN → ネイティブの delegate / クロージャ
+├── ios-host/     # 生成物を取り込む素の SwiftUI アプリ（XcodeGen でプロジェクト生成）
+│   ├── project.yml
+│   └── HostApp/
+│       ├── ContentView.swift       # 検索ワード入力 + 受信結果の表示
+│       └── RepoSearchBridge.swift  # RN → ネイティブの delegate / クロージャ
+└── android-host/ # AAR を取り込む素の Compose アプリ
+    ├── settings.gradle.kts         # local-repo/ を Maven リポジトリとして参照
+    └── app/src/main/java/.../host/
+        ├── MainActivity.kt         # 検索ワード入力 + 受信結果の表示
+        ├── RepoSearchActivity.kt   # RN 画面を表示する BrownfieldActivity
+        └── RepoSearchBridge.kt     # RN → ネイティブの listener / ラムダ
 ```
 
 ## 必要環境
@@ -33,7 +39,8 @@ sample-expo-brownfield/
 | Node.js | 20 以上（動作確認: 24.14.1） |
 | Xcode | 16 以上（動作確認: 26.3） |
 | CocoaPods | 1.16 以上 |
-| XcodeGen | ホストアプリの `.xcodeproj` 生成に使用（`brew install xcodegen`） |
+| XcodeGen | iOS ホストアプリの `.xcodeproj` 生成に使用（`brew install xcodegen`） |
+| Android Studio | Android SDK 36 / JDK 17 が必要（Android を扱う場合のみ） |
 
 > CocoaPods が `Unicode Normalization not appropriate for ASCII-8BIT` で落ちる場合は
 > ロケールが未設定です。`export LANG=en_US.UTF-8` を設定してから実行してください。
@@ -243,24 +250,152 @@ bridge.start()
 
 ## 6. Android（AAR）
 
-同じ設定で Android の Brownfield ライブラリも生成できます。
+### 6-1. AAR を生成する
 
 ```bash
 cd expo-app
-npx expo prebuild --platform android
-npm run brownfield:android      # expo-brownfield build:android --release
-npx expo-brownfield tasks:android   # 利用可能な publish タスク一覧
+npm run prebuild:android      # expo prebuild --platform android
+npm run brownfield:android    # expo-brownfield build:android --release
 ```
 
-出力された AAR を既存の Android アプリから依存に追加し、
-`ReactNativeHostManager` / `ReactNativeFragment` 経由で表示します。
+`app.json` の `expo-brownfield` プラグインが `android/reposearchkit/` に
+ライブラリモジュールを生成し、`android.publishing` の設定に従って
+`android-host/local-repo/` へ Maven 形式で publish します。
 
-## 動作確認済みの構成
+```json
+"android": {
+  "libraryName": "reposearchkit",
+  "package": "com.example.sampleexpobrownfield.reposearchkit",
+  "group": "com.example.sampleexpobrownfield",
+  "version": "1.0.0",
+  "publishing": [
+    { "type": "localDirectory", "name": "hostAppRepo", "path": "../android-host/local-repo" }
+  ]
+}
+```
 
-- Expo SDK 57.0.16 / React Native 0.86.2 / Xcode 26.3 / iPhone 17 シミュレータ
-- `npm run brownfield:ios` → `artifacts/RepoSearchKitPackage-release/`（約 400MB、10 個の xcframework）
-- `xcodegen generate` → `xcodebuild -scheme HostApp` でホストアプリのビルド・起動、
-  RN 画面での GitHub 検索、`popToNative()` によるネイティブ復帰まで確認済み。
+`publishing` を省略すると `mavenLocal()`（`~/.m2/repository`）に publish されます。
+`path` は **Expo プロジェクトのルート（`expo-app/`）からの相対パス**で、
+prebuild 時に絶対 URL として `android/build.gradle` に書き込まれます。
+
+利用可能な publish タスクとリポジトリは次で確認できます。
+
+```bash
+npx expo-brownfield tasks:android
+```
+
+### 6-2. ホストアプリから使う
+
+`android-host/settings.gradle.kts` が `local-repo/` を Maven リポジトリとして参照し、
+`app/build.gradle.kts` が AAR を依存に追加しています。
+
+```kotlin
+// settings.gradle.kts
+dependencyResolutionManagement {
+  repositories {
+    google()
+    mavenCentral()
+    maven { url = uri("${rootDir}/local-repo") }
+  }
+}
+
+// app/build.gradle.kts — group : libraryName : version
+implementation("com.example.sampleexpobrownfield:reposearchkit:1.0.0")
+
+// BrownfieldMessaging / BrownfieldState を使うために必要
+implementation("expo.modules.brownfield:expo.modules.brownfield:57.0.14")
+```
+
+> `expo-brownfield` 本体は AAR の Gradle module metadata 上 **runtime スコープ**でしか
+> 依存に含まれないため、`BrownfieldMessaging` を import するには上記のように
+> 明示的に依存を足す必要があります（`local-repo/` に一緒に publish されています）。
+
+RN 画面は `BrownfieldActivity` を継承した Activity で表示します。
+最短の書き方は `showReactNativeFragment()` の 1 行ですが、
+**この関数は launch options を受け取れません**。検索ワードを initialProps として
+渡したいので、サンプルでは同関数の中身を展開して
+`ReactNativeViewFactory.createFrameLayout()` に `Bundle` を渡しています。
+
+```kotlin
+class RepoSearchActivity : BrownfieldActivity() {
+  override fun onCreate(savedInstanceState: Bundle?) {
+    super.onCreate(savedInstanceState)
+    val keyword = intent.getStringExtra(EXTRA_KEYWORD) ?: DEFAULT_KEYWORD
+
+    ReactNativeHostManager.shared.initialize(application)
+    setContentView(
+      ReactNativeViewFactory.createFrameLayout(this, this, "main", bundleOf("keyword" to keyword))
+    )
+    setUpNativeBackHandling()
+  }
+}
+```
+
+`AndroidManifest.xml` では AppCompat の NoActionBar テーマと `configChanges` が必要です。
+
+```xml
+<activity
+    android:name=".RepoSearchActivity"
+    android:theme="@style/Theme.AppCompat.Light.NoActionBar"
+    android:configChanges="keyboard|keyboardHidden|orientation|screenLayout|screenSize|smallestScreenSize|uiMode" />
+```
+
+### 6-3. 検索結果を受け取る
+
+iOS と同じ形で、`BrownfieldMessaging` を
+[`RepoSearchBridge`](android-host/app/src/main/java/com/example/sampleexpobrownfield/host/RepoSearchBridge.kt)
+が型付きイベントに変換し、**listener（delegate 相当）とラムダの両方**に流します。
+Compose 画面が listener 版、`RepoSearchActivity` の Toast がラムダ版です。
+
+```kotlin
+sealed interface RepoSearchEvent {
+  data class Succeeded(val keyword: String, val repositories: List<SearchedRepository>) : RepoSearchEvent
+  data class Failed(val keyword: String, val message: String) : RepoSearchEvent
+}
+
+val bridge = RepoSearchBridge(onEvent = { event -> ... })
+bridge.start()
+```
+
+> **Android 固有の注意点**
+> - `sendMessage` のペイロードに **入れ子の `null` を含められません**。
+>   `Cannot convert '[object Object]' to a Kotlin type. Value is null, expected an Object`
+>   で失敗するため、`src/native/bridge.ts` では `null` になりうる値を空文字に落として送り、
+>   ネイティブ側で空文字を `null` に戻しています。
+> - `BrownfieldMessaging` のリスナーは Activity のライフサイクルに紐づかないグローバルなものです。
+>   RN 画面は別 Activity なので、リスナーは `onCreate` で登録して `onDestroy` で解除し、
+>   結果は ViewModel に保持しています（iOS の `NavigationStack` の話と同じ理由です）。
+> - `SafeAreaView` は iOS でしか inset が効かないので、
+>   Android ではステータスバーぶんの `paddingTop` を自前で入れています。
+
+### 6-4. ビルドと実行
+
+```bash
+cd android-host
+./gradlew installDebug
+```
+
+`local.properties` に SDK の場所を書くか、`ANDROID_HOME` を通しておいてください。
+
+```
+sdk.dir=/Users/<you>/Library/Android/sdk
+```
+
+> Android Studio 同梱の JBR は JDK 25 で、AGP 8.12 の対応範囲外です。
+> `JAVA_HOME` に JDK 17 を指定してください（`brew install openjdk@17`）。
+
+## 動作確認の状況
+
+iOS / Android とも、**ネイティブ → RN への検索ワード受け渡し**、**RN → ネイティブへの結果通知（20 件）**、
+**ネイティブ画面への復帰**まで通しで確認済みです。
+
+| | 環境 | 生成物 |
+| --- | --- | --- |
+| iOS | Xcode 26.3 / iPhone 17 シミュレータ | `artifacts/RepoSearchKitPackage-release/`（約 400MB、10 個の xcframework） |
+| Android | Android Studio (SDK 36 / NDK 30 / JDK 17) / Pixel 10 エミュレータ | `android-host/local-repo/`（約 6.4MB、`reposearchkit-1.0.0.aar` は 578KB） |
+
+共通の土台は Expo SDK 57.0.16 / React Native 0.86.2 です。
+どちらも Release 構成なので JS バンドルは成果物に同梱され、Metro なしで動作します。
 
 ## 既知の問題
 

@@ -1,6 +1,15 @@
 import { popToNative } from 'expo-brownfield';
 import { useCallback, useState } from 'react';
-import { ActivityIndicator, FlatList, SafeAreaView, StyleSheet, Text, View } from 'react-native';
+import {
+  ActivityIndicator,
+  FlatList,
+  Platform,
+  SafeAreaView,
+  StatusBar,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 
 import { searchRepositories, type Repository } from '../api/github';
 import { ActionButton } from '../components/ActionButton';
@@ -76,6 +85,9 @@ const styles = StyleSheet.create({
   container: {
     backgroundColor: '#fff',
     flex: 1,
+    // SafeAreaView only insets on iOS, so keep the header clear of the
+    // Android status bar as well.
+    paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight ?? 0) : 0,
   },
   header: {
     paddingHorizontal: 20,

@@ -1,0 +1,165 @@
+name: Release
+
+on:
+  push:
+    tags: ['[0-9]+.[0-9]+.[0-9]+*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Tag to build and release
+        required: true
+
+permissions:
+  contents: write
+
+env:
+  TAG: ${{ github.event.inputs.tag || github.ref_name }}
+
+# Release artifacts are deliberately built without a build cache: a stale
+# restore would ship the wrong binaries.
+jobs:
+  ios:
+    name: iOS artifacts
+    runs-on: macos-15
+    timeout-minutes: 120
+    env:
+      LANG: en_US.UTF-8
+      LC_ALL: en_US.UTF-8
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.inputs.tag || github.ref }}
+
+      - name: Select Xcode
+        run: |
+          sudo xcodes select "$(cat .xcode-version)"
+          xcodebuild -version
+
+      - name: Set up Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .node-version
+          cache: npm
+          cache-dependency-path: expo-app/package-lock.json
+
+      - name: Install dependencies
+        working-directory: expo-app
+        run: npm ci
+
+      - name: Generate the native project
+        working-directory: expo-app
+        run: npm run prebuild:ios
+
+      # Swift Package: one aggregate library the host app adds as a local
+      # package. This is the form the sample itself consumes.
+      - name: Build the Swift Package
+        working-directory: expo-app
+        run: npm run brownfield:ios
+
+      # Plain xcframeworks, for host apps that wire the binaries up
+      # themselves rather than going through SPM. Written to a separate
+      # artifacts directory so the two outputs do not overwrite each other.
+      - name: Build the plain xcframeworks
+        working-directory: expo-app
+        run: npx expo-brownfield build:ios --release --artifacts ./artifacts-xcframeworks
+
+      - name: Package the artifacts
+        working-directory: expo-app
+        run: |
+          mkdir -p ../dist
+          ditto -c -k --keepParent --sequesterRsrc \
+            artifacts/RepoSearchKitPackage-release \
+            "../dist/RepoSearchKitPackage-${TAG}-spm.zip"
+          ditto -c -k --keepParent --sequesterRsrc \
+            artifacts-xcframeworks \
+            "../dist/RepoSearchKit-${TAG}-xcframeworks.zip"
+          ls -lh ../dist
+
+      - name: Upload the artifacts for the release job
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ios
+          path: dist/*.zip
+          retention-days: 1
+
+  android:
+    name: Android artifacts
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.inputs.tag || github.ref }}
+
+      - name: Set up JDK
+        uses: actions/setup-java@dd06d9cba3e5552c54d9f8ea23572deb30010f7c # v6.0.0
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Set up the Android SDK
+        uses: android-actions/setup-android@40fd30fb8d7440372e1316f5d1809ec01dcd3699 # v4.0.1
+
+      - name: Set up Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .node-version
+          cache: npm
+          cache-dependency-path: expo-app/package-lock.json
+
+      - name: Install dependencies
+        working-directory: expo-app
+        run: npm ci
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6.3.0
+        with:
+          cache-read-only: true
+
+      - name: Generate the native project
+        working-directory: expo-app
+        run: npm run prebuild:android
+
+      - name: Build and publish the AAR
+        working-directory: expo-app
+        run: npm run brownfield:android
+
+      # The whole Maven layout, not just the AAR: consumers need the POM and
+      # the Gradle module metadata to resolve react-android and hermes-android.
+      - name: Package the artifacts
+        run: |
+          mkdir -p dist
+          (cd android-host && zip -qr "../dist/reposearchkit-${TAG}-maven-repo.zip" local-repo)
+          find android-host/local-repo -name '*.aar' -path '*reposearchkit*' \
+            -exec cp {} "dist/reposearchkit-${TAG}.aar" \;
+          ls -lh dist
+
+      - name: Upload the artifacts for the release job
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: android
+          path: dist/*
+          retention-days: 1
+
+  release:
+    name: Publish the release
+    needs: [ios, android]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download the artifacts from both platforms
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: List the artifacts
+        run: ls -lh dist
+
+      - name: Create the GitHub release
+        uses: softprops/action-gh-release@3d0d9888cb7fd7b750713d6e236d1fcb99157228 # v3.0.2
+        with:
+          tag_name: ${{ github.event.inputs.tag || github.ref_name }}
+          generate_release_notes: true
+          files: dist/*

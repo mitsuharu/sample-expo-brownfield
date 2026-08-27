@@ -611,6 +611,67 @@ Swift に SwiftLint ではなく swift-format を使っているのは、**Xcode
 
 Kotlin には lint を入れていません（必要なら ktlint / detekt が候補です）。
 
+## CI / リリース
+
+[`.github/workflows/`](.github/workflows) に 2 つのワークフローがあります。
+
+### CI（`ci.yml`）
+
+Pull Request の作成・更新・再オープンで走ります。
+
+| ジョブ | ランナー | 内容 |
+| --- | --- | --- |
+| `expo-app` | ubuntu | `npm run lint` / `typecheck` / `test` |
+| `iOS` | macOS | swift-format の検査 → prebuild → xcframework のビルド → ホストアプリのテスト |
+| `Android` | ubuntu | prebuild → AAR のビルドと publish → ホストアプリのテスト |
+
+ホストアプリのテストは**成果物に依存する**ため、ジョブ内で先に xcframework / AAR を
+作ってから実行します。ここが通れば「ビルドできて、かつ組み込んだ状態で動く」ことの確認になります。
+
+バージョンはリポジトリ直下のファイルで固定しています。
+ローカルと CI で同じものを使うためです。
+
+| ファイル | 用途 |
+| --- | --- |
+| `.node-version` | Node.js のバージョン。`actions/setup-node` の `node-version-file` が読む |
+| `.xcode-version` | Xcode のバージョン。ランナー同梱の `xcodes` CLI で選択する |
+
+`actions/*` などのアクションは**コミット SHA で固定**しています
+（[GitHub の推奨](https://docs.github.com/en/actions/security-for-github-actions/security-guides/security-hardening-for-github-actions#using-third-party-actions)）。
+更新時は SHA と行末のバージョンコメントを揃えて変更してください。
+
+キャッシュしているもの:
+
+| 対象 | 効果 |
+| --- | --- |
+| npm（`setup-node`） | 依存のダウンロード |
+| CocoaPods のダウンロードキャッシュ | podspec と pod ソースの取得 |
+| `ExpoModulesJSI.xcframework` | pod install 中のソースビルド。ビルドスクリプト自身がソースとツールチェーンのハッシュで再検証するため、古い復元は自動で作り直される |
+| Gradle（`setup-gradle`） | 依存と configuration cache |
+
+**リリースワークフローではビルドキャッシュを使いません。** 古い復元が混入すると
+誤ったバイナリを配布してしまうためです。
+
+### リリース（`release.yml`）
+
+`1.0.0` のようなバージョン番号のタグを push すると走ります
+（`v` の接頭辞は不要です。`workflow_dispatch` で手動実行も可能）。
+成果物を GitHub Release に添付します。
+
+| ファイル | 内容 |
+| --- | --- |
+| `RepoSearchKitPackage-<tag>-spm.zip` | Swift Package 形式。Xcode の **Add Local** で追加する。本サンプルが使っている形 |
+| `RepoSearchKit-<tag>-xcframeworks.zip` | 素の xcframework 10 個。SPM を経由せず自前で組み込む場合はこちら |
+| `reposearchkit-<tag>-maven-repo.zip` | Maven リポジトリ一式。POM と Gradle module metadata を含む |
+| `reposearchkit-<tag>.aar` | AAR 単体 |
+
+Android は AAR 単体だけでなくリポジトリ一式も添付しています。
+`react-android` と `hermes-android` のバージョンは Gradle module metadata で解決されるため、
+AAR だけでは依存を引けないからです。
+
+> iOS の成果物は圧縮後でも数百 MB になります（xcframework に全アーキテクチャの
+> React Native と Hermes が入るため）。
+
 ## 動作確認の状況
 
 iOS / Android とも、**ネイティブ → RN への検索ワード受け渡し**、**RN → ネイティブへの結果通知（20 件）**、

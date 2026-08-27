@@ -1,0 +1,166 @@
+name: CI
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+# A new push supersedes the previous run. The iOS job takes several minutes,
+# so there is no point letting a stale one finish.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  expo-app:
+    name: expo-app
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: expo-app
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .node-version
+          cache: npm
+          cache-dependency-path: expo-app/package-lock.json
+
+      # Also applies patches/ through the postinstall hook.
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Check types
+        run: npm run typecheck
+
+      - name: Run tests
+        run: npm test
+
+  ios:
+    name: iOS
+    runs-on: macos-15
+    timeout-minutes: 90
+    env:
+      # CocoaPods fails with "Unicode Normalization not appropriate for
+      # ASCII-8BIT" when the locale is unset.
+      LANG: en_US.UTF-8
+      LC_ALL: en_US.UTF-8
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # xcodes ships on the runner image, so the Xcode versions it already
+      # holds can be selected without a third-party action.
+      - name: Select Xcode
+        run: |
+          sudo xcodes select "$(cat .xcode-version)"
+          xcodebuild -version
+
+      - name: Set up Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .node-version
+          cache: npm
+          cache-dependency-path: expo-app/package-lock.json
+
+      - name: Install dependencies
+        working-directory: expo-app
+        run: npm ci
+
+      # Downloaded podspecs and pod sources, not build output.
+      - name: Cache CocoaPods downloads
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/Library/Caches/CocoaPods
+          key: pods-${{ runner.os }}-${{ hashFiles('expo-app/package-lock.json') }}
+          restore-keys: pods-${{ runner.os }}-
+
+      # expo-modules-jsi builds its own xcframework from source during
+      # pod install. The build script keys its cache on a hash of the sources
+      # and the toolchain, so a stale restore rebuilds itself.
+      - name: Cache the ExpoModulesJSI xcframework
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: expo-app/node_modules/expo-modules-jsi/apple/Products
+          key: jsi-${{ runner.os }}-${{ hashFiles('.xcode-version', 'expo-app/package-lock.json') }}
+
+      - name: Lint Swift
+        run: ./scripts/swift-format.sh
+
+      - name: Generate the native project
+        working-directory: expo-app
+        run: npm run prebuild:ios
+
+      # The brownfield framework is what the host app links against, so it has
+      # to be built before the host app can be tested.
+      - name: Build the xcframework
+        working-directory: expo-app
+        run: npm run brownfield:ios
+
+      - name: Generate the host app project
+        working-directory: ios-host
+        run: |
+          brew install xcodegen
+          xcodegen generate
+
+      - name: Test the host app
+        working-directory: ios-host
+        run: |
+          set -o pipefail
+          xcodebuild test \
+            -project HostApp.xcodeproj \
+            -scheme HostApp \
+            -destination 'platform=iOS Simulator,name=iPhone 16' \
+            CODE_SIGNING_ALLOWED=NO \
+            | xcbeautify --renderer github-actions
+
+  android:
+    name: Android
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up JDK
+        uses: actions/setup-java@dd06d9cba3e5552c54d9f8ea23572deb30010f7c # v6.0.0
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Set up the Android SDK
+        uses: android-actions/setup-android@40fd30fb8d7440372e1316f5d1809ec01dcd3699 # v4.0.1
+
+      - name: Set up Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .node-version
+          cache: npm
+          cache-dependency-path: expo-app/package-lock.json
+
+      - name: Install dependencies
+        working-directory: expo-app
+        run: npm ci
+
+      # Caches ~/.gradle and the configuration cache.
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6.3.0
+
+      - name: Generate the native project
+        working-directory: expo-app
+        run: npm run prebuild:android
+
+      # Publishes the AAR into android-host/local-repo, which the host app
+      # resolves its dependency from.
+      - name: Build and publish the AAR
+        working-directory: expo-app
+        run: npm run brownfield:android
+
+      - name: Test the host app
+        working-directory: android-host
+        run: ./gradlew testDebugUnitTest

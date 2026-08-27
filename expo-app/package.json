@@ -11,6 +11,7 @@
     "react-native": "0.86.2"
   },
   "devDependencies": {
+    "@biomejs/biome": "2.5.10",
     "@react-native/jest-preset": "^0.86.2",
     "@testing-library/react-native": "^14.0.1",
     "@types/jest": "^30.0.0",
@@ -28,6 +29,8 @@
     "web": "expo start --web",
     "postinstall": "patch-package",
     "typecheck": "tsc --noEmit",
+    "lint": "biome check",
+    "lint:fix": "biome check --write",
     "test": "jest",
     "prebuild": "expo prebuild --clean",
     "prebuild:ios": "expo prebuild --platform ios --clean",

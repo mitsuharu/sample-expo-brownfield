@@ -5,8 +5,8 @@ on:
   push:
     branches: [main]
 
-# A new push supersedes the previous run. macOS runners bill at 10x, so
-# letting stale runs finish is expensive.
+# A new push supersedes the previous run. The iOS job takes tens of minutes,
+# so there is no point letting a stale one finish.
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true

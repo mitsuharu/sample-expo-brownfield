@@ -22,7 +22,8 @@ sample-expo-brownfield/
 │   │   └── android/RepoSearchBridge.kt     # AAR に同梱する Kotlin
 │   ├── plugins/withRepoSearchBridge.js     # 上記を各ターゲットに注入する config plugin
 │   ├── app.json           # expo-brownfield / expo-build-properties プラグイン設定
-│   └── ios/               # `expo prebuild` の生成物（RepoSearchKit ターゲットを含む）
+│   ├── ios/               # `expo prebuild` の生成物（RepoSearchKit ターゲットを含む）
+│   └── android/           # `expo prebuild` の生成物（reposearchkit モジュールを含む）
 ├── ios-host/     # 生成物を取り込む素の SwiftUI アプリ（XcodeGen でプロジェクト生成）
 │   ├── project.yml
 │   └── HostApp/
@@ -35,15 +36,38 @@ sample-expo-brownfield/
         └── RepoSearchViewModel.kt  # 受信結果の保持
 ```
 
+### `expo-app/ios` と `ios-host` の違い（Android も同様）
+
+紛らわしいので整理します。**どちらも Xcode プロジェクトですが、役割が正反対**です。
+
+| | 何か | 誰が作るか | git 管理 |
+| --- | --- | --- | --- |
+| `expo-app/ios`<br>`expo-app/android` | **成果物のビルド元**。React Native 本体と `RepoSearchKit` フレームワーク（Android は `reposearchkit` モジュール）が入っており、ここから xcframework / AAR を作る | `expo prebuild` が毎回生成 | 対象外（`.gitignore`） |
+| `ios-host`<br>`android-host` | **成果物を取り込む側**。「既存のネイティブアプリ」に相当する、手書きの SwiftUI / Compose アプリ | 人間 | 管理下 |
+
+つまり `expo-app/ios` は Expo アプリを配布可能な形に固めるための作業場で、
+`ios-host` がそれを利用する本番相当のアプリです。
+`expo-app/ios` を直接編集しても次の prebuild で消えるため、
+そこに手を入れたい場合は config plugin を使います（`5-3` を参照）。
+
 ## 必要環境
 
-| ツール | バージョン |
-| --- | --- |
-| Node.js | 20 以上（動作確認: 24.14.1） |
-| Xcode | 16 以上（動作確認: 26.3） |
-| CocoaPods | 1.16 以上 |
-| XcodeGen | iOS ホストアプリの `.xcodeproj` 生成に使用（`brew install xcodegen`） |
-| Android Studio | Android SDK 36 / JDK 17 が必要（Android を扱う場合のみ） |
+| ツール | バージョン | インストール |
+| --- | --- | --- |
+| Node.js | 20 以上（動作確認: 24.14.1） | [nodejs.org](https://nodejs.org/) / `brew install node` |
+| Xcode | 16 以上（動作確認: 26.3） | App Store |
+| CocoaPods | 1.16 以上 | `brew install cocoapods` |
+| XcodeGen | 動作確認: 2.x | `brew install xcodegen` |
+| Android Studio | SDK 36 / NDK / JDK 17 | [developer.android.com](https://developer.android.com/studio) |
+
+- **CocoaPods** は `expo prebuild` が iOS の依存を解決するために使います。
+  Homebrew を使わない場合は `sudo gem install cocoapods` でも構いません。
+- **XcodeGen** は `ios-host` の `.xcodeproj` を `project.yml` から生成するために使います。
+  `.xcodeproj` は git 管理外なので、`ios-host` を開く前に一度実行が必要です。
+- **Android Studio** は Android を扱う場合のみ必要です。SDK Manager から
+  **SDK Platform 36 / Build-Tools / NDK / CMake** を入れてください。
+  同梱の JBR は JDK 25 で AGP 8.12 の対応範囲外なので、
+  ビルド時は `JAVA_HOME` に JDK 17 を指定します（`brew install openjdk@17`）。
 
 > CocoaPods が `Unicode Normalization not appropriate for ASCII-8BIT` で落ちる場合は
 > ロケールが未設定です。`export LANG=en_US.UTF-8` を設定してから実行してください。
@@ -68,6 +92,23 @@ cd expo-app && npm install && npm run ios
 cd expo-app && npm run prebuild:ios
 ```
 
+### prebuild とは何をするものか
+
+Expo アプリは通常、ネイティブのプロジェクト（`ios/` `android/`）を持ちません。
+`app.json` の設定と依存パッケージから、**必要になったときに生成する**方式だからです。
+これを CNG（Continuous Native Generation）と呼び、その生成を行うのが `expo prebuild` です。
+
+生成物は使い捨てで、`.gitignore` の対象です。ネイティブの設定を変えたいときは
+`ios/` を直接編集するのではなく `app.json` や config plugin を書き換え、
+prebuild し直します。これにより、依存の更新や Expo SDK のアップグレードのたびに
+ネイティブ側の差分を手でマージする必要がなくなります。
+
+### brownfield では何が増えるか
+
+素の Expo アプリなら、prebuild が作るのは「アプリを起動するための」プロジェクトです。
+brownfield ではそれに加えて、**アプリではなくライブラリとして配布するためのターゲット**が必要で、
+それを追加するのが `expo-brownfield` プラグインです。
+
 `app.json` の `expo-brownfield` プラグインが、通常の `expoapp` ターゲットに加えて
 **`RepoSearchKit`（フレームワーク）ターゲット**を `ios/` に追加します。
 このターゲットが `ReactNativeHostManager` / `ReactNativeViewController` /
@@ -78,7 +119,7 @@ cd expo-app && npm run prebuild:ios
   "expo-brownfield",
   {
     "ios": { "targetName": "RepoSearchKit", "bundleIdentifier": "com.example.sample.expo.brownfield.reposearchkit" },
-    "android": { "library": "reposearchkit" }
+    "android": { "libraryName": "reposearchkit" }
   }
 ]
 ```
@@ -493,6 +534,57 @@ sdk.dir=/Users/<you>/Library/Android/sdk
 > 中身を変えても同一バージョンなら古いクラスがコンパイルに使われ続けます。
 > `Unresolved reference` が出るのに AAR の中には確かにそのメソッドがある、という状態になります。
 > `app.json` の `android.version` を上げるのが確実です。
+
+## expo-app の npm scripts
+
+`expo-app/package.json` に定義しているコマンドです。すべて `cd expo-app` してから実行します。
+
+### 開発
+
+| コマンド | 内容 |
+| --- | --- |
+| `npm start` | Metro バンドラーを起動する。ホストアプリに Debug 構成の成果物を組み込んでいるときに必要 |
+| `npm run ios` | Expo アプリ単体を iOS シミュレータでビルド・起動する（`expo run:ios`） |
+| `npm run android` | 同じく Android エミュレータで起動する（`expo run:android`） |
+| `npm run web` | ブラウザで起動する |
+
+`ios` / `android` は **`ios-host` / `android-host` ではなく Expo アプリ単体**を起動します。
+RN 画面だけを素早く確認したいときに使います。
+
+### 検証
+
+| コマンド | 内容 |
+| --- | --- |
+| `npm test` | Jest。`src/` の実装をテストする |
+| `npm run typecheck` | `tsc --noEmit`。型エラーの検査のみ |
+| `npm run lint` | Biome。lint とフォーマットの検査のみ |
+| `npm run lint:fix` | Biome。検出した問題を自動修正する |
+
+### ネイティブプロジェクトの生成
+
+| コマンド | 内容 |
+| --- | --- |
+| `npm run prebuild` | iOS / Android 両方を作り直す（`--clean` 付き） |
+| `npm run prebuild:ios` | iOS のみ作り直す |
+| `npm run prebuild:android` | Android のみ生成する |
+
+`--clean` は既存の `ios/` `android/` を削除してから作り直します。
+手を加えていない生成物なので、消えて困るものはありません。
+
+### 成果物の生成
+
+| コマンド | 内容 |
+| --- | --- |
+| `npm run brownfield:ios` | Release の xcframework を Swift Package として出力する。通常はこれ |
+| `npm run brownfield:ios:debug` | Debug 版。JS は同梱されず Metro に接続する |
+| `npm run brownfield:ios:xcframeworks` | Swift Package にせず、素の xcframework だけを出力する |
+| `npm run brownfield:android` | Release の AAR を生成し、`android-host/local-repo/` に publish する |
+
+### 補助
+
+| コマンド | 内容 |
+| --- | --- |
+| `postinstall` | `patch-package` を実行する。`npm install` のたびに自動で走り、`patches/` のパッチを当てる（`既知の問題 1` を参照） |
 
 ## Lint / フォーマット
 

@@ -250,7 +250,7 @@ bridge.start()
 `ios/` `android/` は `expo prebuild` で毎回作り直されるので、手で追加したファイルは消えます。
 そこで自前の config plugin
 [`plugins/withRepoSearchBridge.js`](expo-app/plugins/withRepoSearchBridge.js) が、
-`native/` 以下のソースを prebuild のたびに各ターゲットへ配置します。
+`native/` 以下のソースを prebuild のたびに各ターゲットへ**シンボリックリンク**として配置します。
 
 ```json
 [
@@ -322,8 +322,33 @@ React Native ランタイムを立ち上げずに型変換とイベント配信�
 Metro に影響しないようテスト専用の Babel 設定 `jest.babel.config.js` を置いています。
 また `@testing-library/react-native` v14 では `render` が **async** になっている点に注意してください。
 
-なお `native/` のソース自体はどのプロジェクトにも属さないため、
-IDE で開けるのは prebuild でコピーされた側です。編集は `native/` 側で行ってください。
+#### `native/` の編集について
+
+生成先はコピーではなく **`native/` へのシンボリックリンク**です。
+
+```
+ios/RepoSearchKit/RepoSearchBridge.swift -> ../../native/ios/RepoSearchBridge.swift
+```
+
+Xcode / Android Studio がターゲットのメンバーとして表示するのはこのリンクなので、
+IDE 上でそのまま編集すれば `native/` 側の実体に書き込まれます。
+Xcode・Gradle とも、コンパイル時はリンクを辿るだけで特別な設定は要りません。
+
+ただし **atomic save（一時ファイルに書いて置き換える保存方式）を行うエディタでは、
+リンクが実体ファイルに置き換わることがあります**。そうなると、そのファイルの編集内容は
+次の prebuild で失われます。これを防ぐため、プラグインは生成先が「リンクではない通常ファイルで、
+かつ `native/` 側と内容が異なる」場合に prebuild を停止します。
+
+```
+Error: .../android/reposearchkit/.../RepoSearchBridge.kt is a regular file and differs from
+native/android/RepoSearchBridge.kt.
+It was most likely edited in place — that copy is regenerated on every prebuild.
+Move the changes into native/android/RepoSearchBridge.kt, delete the file, and run prebuild again.
+```
+
+この検査は **mod の中ではなくプラグイン適用時**に実行しています。
+prebuild は mod を走らせる前にネイティブディレクトリを作り直すため、
+mod の中で見てもファイルはすでに消えており、検査が成立しないからです。
 
 ### API 一覧
 

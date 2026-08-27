@@ -1,6 +1,6 @@
 name: HostApp
 options:
-  bundleIdPrefix: com.example.sampleexpobrownfield
+  bundleIdPrefix: com.example.sample.expo.brownfield
   createIntermediateGroups: true
   deploymentTarget:
     iOS: "16.4"
@@ -33,7 +33,7 @@ targets:
         NSLocalNetworkUsageDescription: Allows the React Native screen to connect to the Metro bundler during development.
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.example.sampleexpobrownfield.host
+        PRODUCT_BUNDLE_IDENTIFIER: com.example.sample.expo.brownfield.host
         MARKETING_VERSION: "1.0"
         CURRENT_PROJECT_VERSION: "1"
         SWIFT_VERSION: "5.0"
@@ -50,7 +50,7 @@ targets:
       - path: HostAppTests
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.example.sampleexpobrownfield.host.tests
+        PRODUCT_BUNDLE_IDENTIFIER: com.example.sample.expo.brownfield.host.tests
         SWIFT_VERSION: "5.0"
         GENERATE_INFOPLIST_FILE: YES
     dependencies:

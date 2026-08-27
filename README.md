@@ -7,6 +7,21 @@ React Native 側は「ボタンを押すと GitHub API を `expo` というキ�
 [`expo-brownfield`](https://docs.expo.dev/versions/latest/sdk/brownfield/) で
 XCFramework（Swift Package）に固めて、ネイティブの iOS ホストアプリから表示します。
 
+## デモ
+
+| ネイティブ画面（SwiftUI） | React Native 画面 |
+| --- | --- |
+| <img src="docs/demo-native.png" width="280"> | <img src="docs/demo-react-native.png" width="280"> |
+
+ネイティブ側で検索ワードを入力して React Native 画面を開き、検索した結果を
+ネイティブ側に返して表示するまでの往復です。
+
+**▶ [操作の様子（16 秒）](docs/demo.mov)**
+
+左のネイティブ画面には、検索ワードの入力欄、React Native 画面への 2 つの入口
+（SwiftUI / UIKit）、そして React Native から受け取った検索結果が並んでいます。
+右が組み込まれた React Native 画面です。
+
 ```
 sample-expo-brownfield/
 ├── expo-app/     # Expo アプリ本体（ここから XCFramework / AAR を生成する）
@@ -382,6 +397,64 @@ Xcode / Android Studio 上ではターゲットのメンバーとして通常ど
 > `The document "..." could not be saved. The file doesn't exist.` で失敗します。
 > リンクにすると IDE から編集できなくなります。
 
+### 5-4. RN インスタンスの破棄とメモリ
+
+`ReactNativeHostManager.shared.initialize()` で作られる React Native インスタンスは
+**アプリ内で 1 つだけ**で、RN 画面を開いたり閉じたりしても使い回されます。
+2 回目以降の表示が速いのはこのためです。
+
+このインスタンスごと破棄してメモリを戻す API も用意されています。
+
+```swift
+ReactNativeHostManager.shared.cleanupPreviousInstance()
+```
+
+**本サンプルでは呼んでいません。** brownfield は「RN 画面を何度も行き来する」前提なので、
+インスタンスを保持したままにしています。破棄すると次に開くときの起動コストが再びかかるため、
+**メモリと起動速度のトレードオフ**になります。
+
+呼ぶとすれば「RN のセクションから完全に抜けたとき」です。たとえば、アプリの一部の機能だけが
+React Native で、そのフローを抜けたら当分戻らないと分かっている場合などです。
+逆に、タブの 1 つが RN 画面といった構成では、保持したままの方が快適です。
+
+呼んだあとに再び RN 画面を表示する場合は、`initialize()` からやり直す必要があります。
+
+#### 実際に測った結果
+
+「何度も操作するとメモリが増え続けるのでは」という懸念があったので計測しました。
+結論として、**このサンプルの範囲ではリークは確認できませんでした**。
+
+Android（`adb shell dumpsys meminfo`）で検索を 10 回繰り返した場合:
+
+| 回数 | PSS | Native Heap |
+| --- | --- | --- |
+| 0（検索前） | 139 MB | 17.4 MB |
+| 1 | 172 MB | 23.4 MB |
+| 5 | 173 MB | 23.9 MB |
+| 10 | 173 MB | 23.8 MB |
+
+初回に増えたあとは横ばいです。「開く → 検索 → 戻る」を 6 サイクル繰り返しても 178MB で安定し、
+**`Activities` / `Views` / `AppContexts` の数が一定**でした。Activity や View がリークしていれば
+ここが毎回増えるので、破棄は正しく行われています。
+
+iOS（シミュレータプロセスの RSS）で検索を 8 回:
+
+| 時点 | RSS |
+| --- | --- |
+| 検索前 | 321 MB |
+| 1 回後 | 356 MB |
+| 4 回後 | 381 MB |
+| 8 回後 | 382 MB |
+| 20 秒放置後 | 285 MB |
+
+4 回目以降はほとんど増えず、放置すると検索前より下がりました。
+連打中に増えて見えるのは回収が追いついていないだけで、保持されているわけではありません。
+
+> 上記の iOS の数値は **Debug ビルドをシミュレータで測ったもの**です。
+> dev support が載る分、実アプリより多めに出ます。正確に評価するなら、
+> Release ビルドを実機で Instruments（Allocations / Leaks）を使ってください。
+> Android の値もエミュレータのものです。
+
 ### API 一覧
 
 `expo-brownfield` が用意している API:
@@ -389,6 +462,7 @@ Xcode / Android Studio 上ではターゲットのメンバーとして通常ど
 | JS | Swift | 用途 |
 | --- | --- | --- |
 | `popToNative(animated)` | — | RN 画面を閉じてネイティブに戻る |
+| — | `ReactNativeHostManager` | RN インスタンスの初期化と破棄（`5-4`） |
 | `setNativeBackEnabled(enabled)` | — | ネイティブの戻る操作の有効/無効 |
 | `sendMessage` / `addMessageListener` | `BrownfieldMessaging` | 双方向メッセージ |
 | `useSharedState(key)` | `BrownfieldState` | ネイティブと共有する状態 |

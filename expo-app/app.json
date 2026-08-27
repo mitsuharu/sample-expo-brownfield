@@ -8,10 +8,10 @@
     "userInterfaceStyle": "light",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.example.sampleexpobrownfield"
+      "bundleIdentifier": "com.example.sample.expo.brownfield"
     },
     "android": {
-      "package": "com.example.sampleexpobrownfield",
+      "package": "com.example.sample.expo.brownfield",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/android-icon-foreground.png",
@@ -54,12 +54,12 @@
         {
           "ios": {
             "targetName": "RepoSearchKit",
-            "bundleIdentifier": "com.example.sampleexpobrownfield.reposearchkit"
+            "bundleIdentifier": "com.example.sample.expo.brownfield.reposearchkit"
           },
           "android": {
             "libraryName": "reposearchkit",
-            "package": "com.example.sampleexpobrownfield.reposearchkit",
-            "group": "com.example.sampleexpobrownfield",
+            "package": "com.example.sample.expo.brownfield.reposearchkit",
+            "group": "com.example.sample.expo.brownfield",
             "version": "1.0.1",
             "publishing": [
               {

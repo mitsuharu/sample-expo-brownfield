@@ -250,7 +250,7 @@ bridge.start()
 `ios/` `android/` は `expo prebuild` で毎回作り直されるので、手で追加したファイルは消えます。
 そこで自前の config plugin
 [`plugins/withRepoSearchBridge.js`](expo-app/plugins/withRepoSearchBridge.js) が、
-`native/` 以下のソースを prebuild のたびに各ターゲットへ**シンボリックリンク**として配置します。
+`native/` 以下のソースを、prebuild のたびに各ターゲットから**直接参照するよう設定**します。
 
 ```json
 [
@@ -324,31 +324,26 @@ Metro に影響しないようテスト専用の Babel 設定 `jest.babel.config
 
 #### `native/` の編集について
 
-生成先はコピーではなく **`native/` へのシンボリックリンク**です。
+生成先にファイルはコピーされません。**実体は `native/` の 1 つだけ**で、
+生成されたプロジェクトがそこを参照します。
 
 ```
-ios/RepoSearchKit/RepoSearchBridge.swift -> ../../native/ios/RepoSearchBridge.swift
+# iOS: pbxproj のファイル参照が SOURCE_ROOT（= ios/）からの相対パスで native/ を指す
+path = "../native/ios/RepoSearchBridge.swift"; sourceTree = SOURCE_ROOT;
+
+# Android: ライブラリモジュールのソースセットに native/ を足す
+sourceSets { getByName("main") { java.srcDir("../../native/android") } }
 ```
 
-Xcode / Android Studio がターゲットのメンバーとして表示するのはこのリンクなので、
-IDE 上でそのまま編集すれば `native/` 側の実体に書き込まれます。
-Xcode・Gradle とも、コンパイル時はリンクを辿るだけで特別な設定は要りません。
+Xcode / Android Studio 上ではターゲットのメンバーとして通常どおり表示され、
+編集・保存すると `native/` の実体がそのまま更新されます。
+複製が存在しないので、「生成先を編集してしまい prebuild で失われる」事故は起こりません。
 
-ただし **atomic save（一時ファイルに書いて置き換える保存方式）を行うエディタでは、
-リンクが実体ファイルに置き換わることがあります**。そうなると、そのファイルの編集内容は
-次の prebuild で失われます。これを防ぐため、プラグインは生成先が「リンクではない通常ファイルで、
-かつ `native/` 側と内容が異なる」場合に prebuild を停止します。
-
-```
-Error: .../android/reposearchkit/.../RepoSearchBridge.kt is a regular file and differs from
-native/android/RepoSearchBridge.kt.
-It was most likely edited in place — that copy is regenerated on every prebuild.
-Move the changes into native/android/RepoSearchBridge.kt, delete the file, and run prebuild again.
-```
-
-この検査は **mod の中ではなくプラグイン適用時**に実行しています。
-prebuild は mod を走らせる前にネイティブディレクトリを作り直すため、
-mod の中で見てもファイルはすでに消えており、検査が成立しないからです。
+> **シンボリックリンクでは解決しません。**
+> Xcode の保存は `FileManager.replaceItem(at:withItemAt:)` を経由しますが、
+> この API はシンボリックリンクを元ファイルとして受け付けず、
+> `The document "..." could not be saved. The file doesn't exist.` で失敗します。
+> リンクにすると IDE から編集できなくなります。
 
 ### API 一覧
 

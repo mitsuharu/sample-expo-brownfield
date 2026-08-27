@@ -20,24 +20,38 @@ const path = require('node:path');
  * prebuild.
  */
 const linkSource = (sourcePath, destinationPath) => {
-  const existing = fs.lstatSync(destinationPath, { throwIfNoEntry: false });
-
-  if (existing?.isFile()) {
-    // Not a link: an editor replaced it while saving, or an older prebuild
-    // copied it. Either way it may hold edits that only exist here.
-    const isSameContent =
-      fs.readFileSync(destinationPath, 'utf8') === fs.readFileSync(sourcePath, 'utf8');
-    if (!isSameContent) {
-      throw new Error(
-        `${destinationPath} is a regular file and differs from ${sourcePath}.\n` +
-          'It looks like it was edited in place. Copy the changes back into native/ ' +
-          'and delete the file, then run prebuild again.'
-      );
-    }
-  }
-
   fs.rmSync(destinationPath, { force: true });
   fs.symlinkSync(sourcePath, destinationPath);
+};
+
+/**
+ * Fails when a generated file is a regular file that differs from its source.
+ *
+ * A symlink survives an in-place edit, but an editor that saves atomically
+ * replaces it with a plain file — and those edits live nowhere else. This has
+ * to run while the plugin is applied rather than inside a mod: prebuild
+ * recreates the native directories before mods run, so by then the evidence is
+ * already gone.
+ */
+const assertNotEditedInPlace = (projectRoot, sources, destinationDir) => {
+  for (const source of sources) {
+    const sourcePath = path.join(projectRoot, source);
+    const destinationPath = path.join(destinationDir, path.basename(source));
+
+    const existing = fs.lstatSync(destinationPath, { throwIfNoEntry: false });
+    if (!existing?.isFile()) {
+      continue;
+    }
+    if (fs.readFileSync(destinationPath, 'utf8') === fs.readFileSync(sourcePath, 'utf8')) {
+      continue;
+    }
+
+    throw new Error(
+      `${destinationPath} is a regular file and differs from ${source}.\n` +
+        'It was most likely edited in place — that copy is regenerated on every ' +
+        `prebuild. Move the changes into ${source}, delete the file, and run prebuild again.`
+    );
+  }
 };
 
 /** pbxproj stores names quoted (`"RepoSearchKit"`), so compare unquoted. */
@@ -141,10 +155,24 @@ const withAndroidSources = (config, { libraryName, packageName, sources }) => {
 };
 
 const withRepoSearchBridge = (config, { ios, android }) => {
+  const projectRoot = config._internal?.projectRoot ?? process.cwd();
+
   if (ios) {
+    assertNotEditedInPlace(projectRoot, ios.sources, path.join(projectRoot, 'ios', ios.targetName));
     config = withIosSources(config, ios);
   }
   if (android) {
+    assertNotEditedInPlace(
+      projectRoot,
+      android.sources,
+      path.join(
+        projectRoot,
+        'android',
+        android.libraryName,
+        'src/main/java',
+        ...android.packageName.split('.')
+      )
+    );
     config = withAndroidSources(config, android);
   }
   return config;

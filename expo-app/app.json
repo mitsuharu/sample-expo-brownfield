@@ -61,7 +61,7 @@
             "libraryName": "reposearchkit",
             "package": "com.example.sampleexpobrownfield.reposearchkit",
             "group": "com.example.sampleexpobrownfield",
-            "version": "1.0.0",
+            "version": "1.0.1",
             "publishing": [
               {
                 "type": "localDirectory",

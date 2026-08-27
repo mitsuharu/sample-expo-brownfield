@@ -290,15 +290,40 @@ expo-brownfield との実行順を気にする必要もありません。
 >   Android も同様で、同じバージョンで publish し直したときは
 >   `./gradlew --refresh-dependencies` が必要です。
 
-#### この構成の検証について
+#### テスト
 
-`native/` のソースはどのプロジェクトにも属さないので、**担保はコンパイルが通ることだけ**です。
+責務ごとに分けています。
 
-- `npm run brownfield:ios` / `brownfield:android` が各ターゲットをビルドするため、
-  壊れていれば成果物の生成が失敗します。
-- prebuild 後に `ios/expoapp.xcworkspace` や `android/` を IDE で開けば補完も型チェックも効きますが、
-  **それはコピーの方**です。直すのは `native/` 側で、コピーへの変更は次の prebuild で消えます。
-- ユニットテストはありません。型変換ロジックは実機で動かして確認しています。
+| 対象 | 場所 | 内容 |
+| --- | --- | --- |
+| `src/` の実装 | `expo-app` (Jest) | API クライアント、ネイティブへの通知、検索画面 |
+| bridge と組み込み | `ios-host` (XCTest) / `android-host` (JUnit + Robolectric) | ペイロードの型変換、イベント配信、ホスト側の状態管理 |
+
+```bash
+cd expo-app    && npm test                  # 18 tests
+cd ios-host    && xcodebuild test -project HostApp.xcodeproj -scheme HostApp \
+                    -destination 'platform=iOS Simulator,name=iPhone 17'   # 15 tests
+cd android-host && ./gradlew testDebugUnitTest                             # 17 tests
+```
+
+bridge のテストをホストアプリ側に置いているのは、**成果物を利用する側から公開 API を検証できる**
+からです。`RepoSearchBridge.receive(_:)` がメッセージ 1 件を受け取る公開の入口になっているので、
+React Native ランタイムを立ち上げずに型変換とイベント配信を検証できます。
+
+カバーしているのは、実際に踏んだ失敗そのものです。
+
+- JS の数値が `Double` で渡ること（`as? Int` / `as? Int` 相当が失敗する）
+- `null` の代わりに送っている空文字を `null` に戻すこと
+- 必須フィールドを欠いた要素や無関係なメッセージを黙って捨てること
+- delegate（listener）とクロージャの両方に、メインスレッドで届くこと
+
+`expo-app` 側は Jest を使っていますが、**SDK 57 に対応した `jest-expo` の安定版がまだ無い**ため
+（`react-native/jest-preset` の移設に追随していない）、`@react-native/jest-preset` を直接使い、
+Metro に影響しないようテスト専用の Babel 設定 `jest.babel.config.js` を置いています。
+また `@testing-library/react-native` v14 では `render` が **async** になっている点に注意してください。
+
+なお `native/` のソース自体はどのプロジェクトにも属さないため、
+IDE で開けるのは prebuild でコピーされた側です。編集は `native/` 側で行ってください。
 
 ### API 一覧
 
@@ -330,7 +355,7 @@ npm run brownfield:android    # expo-brownfield build:android --release
   "libraryName": "reposearchkit",
   "package": "com.example.sampleexpobrownfield.reposearchkit",
   "group": "com.example.sampleexpobrownfield",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "publishing": [
     { "type": "localDirectory", "name": "hostAppRepo", "path": "../android-host/local-repo" }
   ]
@@ -363,7 +388,7 @@ dependencyResolutionManagement {
 }
 
 // app/build.gradle.kts — group : libraryName : version
-implementation("com.example.sampleexpobrownfield:reposearchkit:1.0.0")
+implementation("com.example.sampleexpobrownfield:reposearchkit:1.0.1")
 ```
 
 > ホストアプリから `BrownfieldMessaging` を直接使う場合は、
@@ -446,6 +471,13 @@ sdk.dir=/Users/<you>/Library/Android/sdk
 > Android Studio 同梱の JBR は JDK 25 で、AGP 8.12 の対応範囲外です。
 > `JAVA_HOME` に JDK 17 を指定してください（`brew install openjdk@17`）。
 
+> **同じバージョンで publish し直さないでください。**
+> Gradle は依存の解決結果だけでなく、**AAR を展開した結果（`~/.gradle/caches/*/transforms/`）も
+> キャッシュ**します。`--refresh-dependencies` はこの展開キャッシュを無効化しないため、
+> 中身を変えても同一バージョンなら古いクラスがコンパイルに使われ続けます。
+> `Unresolved reference` が出るのに AAR の中には確かにそのメソッドがある、という状態になります。
+> `app.json` の `android.version` を上げるのが確実です。
+
 ## 動作確認の状況
 
 iOS / Android とも、**ネイティブ → RN への検索ワード受け渡し**、**RN → ネイティブへの結果通知（20 件）**、
@@ -454,10 +486,12 @@ iOS / Android とも、**ネイティブ → RN への検索ワード受け渡�
 | | 環境 | 生成物 |
 | --- | --- | --- |
 | iOS | Xcode 26.3 / iPhone 17 シミュレータ | `artifacts/RepoSearchKitPackage-release/`（約 400MB、10 個の xcframework） |
-| Android | Android Studio (SDK 36 / NDK 30 / JDK 17) / Pixel 10 エミュレータ | `android-host/local-repo/`（約 6.4MB、`reposearchkit-1.0.0.aar` は 578KB） |
+| Android | Android Studio (SDK 36 / NDK 30 / JDK 17) / Pixel 10 エミュレータ | `android-host/local-repo/`（約 6.4MB、`reposearchkit-1.0.1.aar` は約 590KB） |
 
 共通の土台は Expo SDK 57.0.16 / React Native 0.86.2 です。
 どちらも Release 構成なので JS バンドルは成果物に同梱され、Metro なしで動作します。
+
+自動テストは 3 つのプロジェクトで計 50 件が通ります（`5-3` のテストを参照）。
 
 ## 既知の問題
 

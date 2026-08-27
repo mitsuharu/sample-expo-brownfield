@@ -45,7 +45,7 @@ class RepoSearchBridge(
 
   fun start() {
     if (listenerId != null) return
-    listenerId = BrownfieldMessaging.addListener { message -> handle(message) }
+    listenerId = BrownfieldMessaging.addListener { message -> receive(message) }
   }
 
   fun stop() {
@@ -55,7 +55,13 @@ class RepoSearchBridge(
     }
   }
 
-  private fun handle(message: Map<String, Any?>) {
+  /**
+   * Converts one raw message and delivers the event on the main thread.
+   *
+   * The messaging channel calls this; it is public so host apps can unit test
+   * the conversion without standing up a React Native runtime.
+   */
+  fun receive(message: Map<String, Any?>) {
     val event = makeEvent(message) ?: return
     mainHandler.post {
       listener?.onRepoSearchEvent(event)

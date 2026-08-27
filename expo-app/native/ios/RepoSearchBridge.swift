@@ -62,7 +62,7 @@ public final class RepoSearchBridge {
   public func start() {
     guard listenerID == nil else { return }
     listenerID = BrownfieldMessaging.addListener { [weak self] message in
-      self?.handle(message)
+      self?.receive(message)
     }
   }
 
@@ -72,7 +72,11 @@ public final class RepoSearchBridge {
     self.listenerID = nil
   }
 
-  private func handle(_ message: [String: Any?]) {
+  /// Converts one raw message and delivers the event on the main queue.
+  ///
+  /// The messaging channel calls this; it is public so host apps can unit test
+  /// the conversion without standing up a React Native runtime.
+  public func receive(_ message: [String: Any?]) {
     guard let event = Self.makeEvent(from: message) else { return }
     DispatchQueue.main.async { [weak self] in
       guard let self else { return }

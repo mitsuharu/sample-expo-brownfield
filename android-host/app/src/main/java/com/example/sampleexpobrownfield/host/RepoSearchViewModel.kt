@@ -4,6 +4,10 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
+import com.example.sampleexpobrownfield.reposearchkit.RepoSearchBridge
+import com.example.sampleexpobrownfield.reposearchkit.RepoSearchEvent
+import com.example.sampleexpobrownfield.reposearchkit.RepoSearchListener
+import com.example.sampleexpobrownfield.reposearchkit.SearchedRepository
 
 /**
  * Receives search results through the listener form of the bridge.

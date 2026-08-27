@@ -33,6 +33,24 @@
         }
       ],
       [
+        "./plugins/withRepoSearchBridge",
+        {
+          "ios": {
+            "targetName": "RepoSearchKit",
+            "sources": [
+              "native/ios/RepoSearchBridge.swift"
+            ]
+          },
+          "android": {
+            "libraryName": "reposearchkit",
+            "packageName": "com.example.sampleexpobrownfield.reposearchkit",
+            "sources": [
+              "native/android/RepoSearchBridge.kt"
+            ]
+          }
+        }
+      ],
+      [
         "expo-brownfield",
         {
           "ios": {

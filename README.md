@@ -193,6 +193,7 @@ Xcode で手動で追加する場合は **File → Add Package Dependencies → 
 ホストアプリ側のコードはこれだけです。
 
 ```swift
+// Swift（ios-host/HostApp/HostApp.swift）
 import RepoSearchKit
 
 @main
@@ -205,6 +206,8 @@ struct HostApp: App {
 ```
 
 ```swift
+// Swift（ios-host のコード）
+
 // SwiftUI から
 NavigationLink("RN 画面を開く") {
   ReactNativeView(moduleName: "main")
@@ -228,7 +231,7 @@ Release 構成では JS バンドルが `RepoSearchKit.xcframework` に同梱さ
 検索ワードは JS 側にハードコードせず、ホストアプリから `initialProps` で渡します。
 
 ```swift
-// ios-host/HostApp/ContentView.swift
+// Swift（ios-host/HostApp/ContentView.swift）
 ReactNativeView(moduleName: "main", initialProps: ["keyword": store.effectiveKeyword])
 
 // UIKit の場合
@@ -238,7 +241,7 @@ ReactNativeViewController(moduleName: "main", initialProps: ["keyword": keyword]
 `initialProps` はルートコンポーネントの props としてそのまま届きます。
 
 ```tsx
-// expo-app/App.tsx
+// TypeScript（expo-app/App.tsx）
 export default function App({ keyword }: RootProps) {
   return <RepoSearchScreen keyword={keyword ?? DEFAULT_KEYWORD} />;
 }
@@ -255,7 +258,7 @@ export default function App({ keyword }: RootProps) {
 RN 側は検索完了時に `sendMessage()` で結果を投げます。
 
 ```ts
-// expo-app/src/native/bridge.ts
+// TypeScript（expo-app/src/native/bridge.ts）
 export function notifySearchSucceeded(keyword: string, repositories: Repository[]) {
   sendMessage({ type: 'searchSucceeded', keyword, repositories });
 }
@@ -266,6 +269,7 @@ export function notifySearchSucceeded(keyword: string, repositories: Repository[
 型付きの `RepoSearchEvent` に変換し、メインキューで **delegate とクロージャの両方**に流しています。
 
 ```swift
+// Swift（expo-app/native/ios/RepoSearchBridge.swift と ios-host）
 enum RepoSearchEvent {
   case succeeded(keyword: String, repositories: [SearchedRepository])
   case failed(keyword: String, message: String)
@@ -308,6 +312,7 @@ bridge.start()
 `RepoSearchBridge` に送信側を足しました。受信側の `RepoSearchEvent` と対になる形です。
 
 ```swift
+// Swift（expo-app/native/ios/RepoSearchBridge.swift）
 public enum RepoSearchCommand {
   case setKeyword(String)
 }
@@ -316,6 +321,7 @@ bridge.send(.setKeyword("swift"))
 ```
 
 ```kotlin
+// Kotlin（expo-app/native/android/RepoSearchBridge.kt）
 sealed interface RepoSearchCommand {
   data class SetKeyword(val keyword: String) : RepoSearchCommand
 }
@@ -326,6 +332,7 @@ bridge.send(RepoSearchCommand.SetKeyword("swift"))
 JS 側は購読するだけです。
 
 ```ts
+// TypeScript（expo-app/src/screens/RepoSearchScreen.tsx）
 useEffect(
   () => addKeywordListener((next) => setKeyword(next)),
   [],
@@ -391,10 +398,10 @@ useEffect(
 | bridge と組み込み | `ios-host` (XCTest) / `android-host` (JUnit + Robolectric) | ペイロードの型変換、イベント配信、ホスト側の状態管理 |
 
 ```bash
-cd expo-app    && npm test                  # 18 tests
+cd expo-app    && npm test                  # 20 tests
 cd ios-host    && xcodebuild test -project HostApp.xcodeproj -scheme HostApp \
-                    -destination 'platform=iOS Simulator,name=iPhone 17'   # 15 tests
-cd android-host && ./gradlew testDebugUnitTest                             # 17 tests
+                    -destination 'platform=iOS Simulator,name=iPhone 17'   # 18 tests
+cd android-host && ./gradlew testDebugUnitTest                             # 20 tests
 ```
 
 bridge のテストをホストアプリ側に置いているのは、**成果物を利用する側から公開 API を検証できる**
@@ -445,6 +452,7 @@ Xcode / Android Studio 上ではターゲットのメンバーとして通常ど
 このインスタンスごと破棄してメモリを戻す API も用意されています。
 
 ```swift
+// Swift（ホストアプリ側で呼ぶ）
 ReactNativeHostManager.shared.cleanupPreviousInstance()
 ```
 
@@ -559,6 +567,8 @@ npx expo-brownfield tasks:android
 `app/build.gradle.kts` が AAR を依存に追加しています。
 
 ```kotlin
+// Kotlin（android-host/settings.gradle.kts と app/build.gradle.kts）
+
 // settings.gradle.kts
 dependencyResolutionManagement {
   repositories {
@@ -585,6 +595,7 @@ RN 画面は `BrownfieldActivity` を継承した Activity で表示します。
 `ReactNativeViewFactory.createFrameLayout()` に `Bundle` を渡しています。
 
 ```kotlin
+// Kotlin（android-host/app/src/main/java/.../RepoSearchActivity.kt）
 class RepoSearchActivity : BrownfieldActivity() {
   override fun onCreate(savedInstanceState: Bundle?) {
     super.onCreate(savedInstanceState)
@@ -602,6 +613,7 @@ class RepoSearchActivity : BrownfieldActivity() {
 `AndroidManifest.xml` では AppCompat の NoActionBar テーマと `configChanges` が必要です。
 
 ```xml
+<!-- android-host/app/src/main/AndroidManifest.xml -->
 <activity
     android:name=".RepoSearchActivity"
     android:theme="@style/Theme.AppCompat.Light.NoActionBar"
@@ -616,6 +628,7 @@ iOS と同じ形で、`BrownfieldMessaging` を
 Compose 画面が listener 版、`RepoSearchActivity` の Toast がラムダ版です。
 
 ```kotlin
+// Kotlin（expo-app/native/android/RepoSearchBridge.kt と android-host）
 sealed interface RepoSearchEvent {
   data class Succeeded(val keyword: String, val repositories: List<SearchedRepository>) : RepoSearchEvent
   data class Failed(val keyword: String, val message: String) : RepoSearchEvent
@@ -819,7 +832,7 @@ iOS / Android とも、**ネイティブ → RN への検索ワード受け渡�
 共通の土台は Expo SDK 57.0.16 / React Native 0.86.2 です。
 どちらも Release 構成なので JS バンドルは成果物に同梱され、Metro なしで動作します。
 
-自動テストは 3 つのプロジェクトで計 50 件が通ります（`5-3` のテストを参照）。
+自動テストは 3 つのプロジェクトで計 58 件が通ります（`5-4` のテストを参照）。
 
 ## 既知の問題
 

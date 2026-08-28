@@ -90,14 +90,28 @@ struct ContentView: View {
 }
 
 /// SwiftUI entry point: `ReactNativeView` is vended by the generated brownfield framework.
+/// Keywords the host app can push into the screen while it is open.
+private let presetKeywords = ["expo", "swift", "kotlin"]
+
 private struct RepoSearchScreen: View {
   let keyword: String
+
+  private let bridge = RepoSearchBridge()
 
   var body: some View {
     ReactNativeView(moduleName: "main", initialProps: ["keyword": keyword])
       .ignoresSafeArea(edges: .bottom)
       .navigationTitle("Repo Search (RN)")
       .navigationBarTitleDisplayMode(.inline)
+      .toolbar {
+        // initialProps is fixed once this screen exists, so changing the
+        // keyword from here goes over the message channel instead.
+        Menu("キーワード") {
+          ForEach(presetKeywords, id: \.self) { preset in
+            Button(preset) { bridge.send(.setKeyword(preset)) }
+          }
+        }
+      }
   }
 }
 

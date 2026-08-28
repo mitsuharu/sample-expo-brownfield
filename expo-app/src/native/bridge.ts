@@ -1,10 +1,11 @@
 /**
- * Messages this React Native screen sends back to the native host app.
+ * The message channel between this screen and the native host app. It carries
+ * traffic in both directions: results out, commands in.
  *
- * Native listens with `BrownfieldMessaging.addListener { message in ... }`
- * (see ios-host/HostApp/RepoSearchBridge.swift).
+ * Both ends are typed by RepoSearchBridge, which lives in the brownfield
+ * artifact (see expo-app/native/).
  */
-import { sendMessage } from 'expo-brownfield'
+import { addMessageListener, sendMessage } from 'expo-brownfield'
 
 import type { Repository } from '../api/github'
 
@@ -15,9 +16,15 @@ export type RootProps = {
 
 export const DEFAULT_KEYWORD = 'expo'
 
+/** Sent to native. */
 export const MessageType = {
   searchSucceeded: 'searchSucceeded',
   searchFailed: 'searchFailed',
+} as const
+
+/** Received from native. */
+export const CommandType = {
+  setKeyword: 'setKeyword',
 } as const
 
 /**
@@ -51,4 +58,24 @@ export function notifySearchFailed(keyword: string, message: string) {
     keyword,
     message,
   })
+}
+
+/**
+ * Listens for the host app changing the keyword.
+ *
+ * `initialProps` can only deliver a value while the screen is being created,
+ * so replacing it on a screen that is already open goes through the message
+ * channel instead.
+ */
+export function addKeywordListener(onKeyword: (keyword: string) => void) {
+  const subscription = addMessageListener((event) => {
+    if (event?.type !== CommandType.setKeyword) {
+      return
+    }
+    if (typeof event.keyword === 'string' && event.keyword.length > 0) {
+      onKeyword(event.keyword)
+    }
+  })
+
+  return () => subscription.remove()
 }

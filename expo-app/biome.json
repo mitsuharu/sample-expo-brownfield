@@ -19,6 +19,7 @@
       "!android",
       "!ios",
       "!artifacts",
+      "!artifacts-xcframeworks",
       "!build",
       "!.expo",
       "!coverage",

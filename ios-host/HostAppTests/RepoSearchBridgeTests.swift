@@ -153,4 +153,28 @@ final class RepoSearchBridgeTests: XCTestCase {
     bridge.stop()
     bridge.stop()
   }
+
+  // MARK: - Sending
+
+  func testSetKeywordPayload() throws {
+    let payload = RepoSearchBridge.payload(for: .setKeyword("swift"))
+
+    XCTAssertEqual(payload["type"] as? String, "setKeyword")
+    XCTAssertEqual(payload["keyword"] as? String, "swift")
+  }
+
+  func testSetKeywordPayloadCarriesNoNestedNil() throws {
+    // Android cannot convert a nested null to a Kotlin type, so the shared
+    // wire format never carries one.
+    let payload = RepoSearchBridge.payload(for: .setKeyword("swift"))
+
+    for (key, value) in payload {
+      XCTAssertNotNil(value, "\(key) is nil")
+    }
+  }
+
+  func testSendingWithoutAReactNativeRuntimeIsHarmless() {
+    // Nothing is listening in a unit test; this must not trap.
+    RepoSearchBridge().send(.setKeyword("swift"))
+  }
 }

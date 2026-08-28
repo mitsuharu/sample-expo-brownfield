@@ -61,7 +61,7 @@ sample-expo-brownfield/
 つまり `expo-app/ios` は Expo アプリを配布可能な形に固めるための作業場で、
 `ios-host` がそれを利用する本番相当のアプリです。
 `expo-app/ios` を直接編集しても次の prebuild で消えるため、
-そこに手を入れたい場合は config plugin を使います（`5-3` を参照）。
+そこに手を入れたい場合は config plugin を使います（`5-4` を参照）。
 
 ## 必要環境
 
@@ -247,6 +247,9 @@ export default function App({ keyword }: RootProps) {
 単体起動時は `initialProps` が無いので、`DEFAULT_KEYWORD`（`expo`）にフォールバックします。
 ホストアプリ側では `TextField` に入力した値がそのまま次の RN 画面に渡ります。
 
+> `initialProps` が届くのは**画面が作られるときの 1 回だけ**です。
+> 開いたままキーワードを差し替えることはできないので、それは `5-3` のメッセージで行います。
+
 ### 5-2. 検索結果をネイティブに返す（メッセージ + delegate / クロージャ）
 
 RN 側は検索完了時に `sendMessage()` で結果を投げます。
@@ -294,7 +297,45 @@ bridge.start()
 >   リスナーの解除をそこに書くと、RN 画面からのメッセージを取りこぼします
 >   （サンプルでは `NavigationStack` 自体に付けています）。
 
-### 5-3. bridge をフレームワーク / ライブラリ側に持たせる
+### 5-3. ネイティブから RN にメッセージを送る
+
+`BrownfieldMessaging` は**双方向**です。`5-2` と同じチャンネルを逆向きに使うと、
+`initialProps` では届けられない「開いている画面への指示」を送れます。
+
+サンプルでは、RN 画面を開いたままキーワードを差し替えられるようにしています
+（iOS はツールバーのメニュー、Android は画面上部のボタン列）。
+
+`RepoSearchBridge` に送信側を足しました。受信側の `RepoSearchEvent` と対になる形です。
+
+```swift
+public enum RepoSearchCommand {
+  case setKeyword(String)
+}
+
+bridge.send(.setKeyword("swift"))
+```
+
+```kotlin
+sealed interface RepoSearchCommand {
+  data class SetKeyword(val keyword: String) : RepoSearchCommand
+}
+
+bridge.send(RepoSearchCommand.SetKeyword("swift"))
+```
+
+JS 側は購読するだけです。
+
+```ts
+useEffect(
+  () => addKeywordListener((next) => setKeyword(next)),
+  [],
+)
+```
+
+受信と違い、送信にリスナーの登録は要りません。メッセージは画面が開いていなくても送られ、
+誰も購読していなければ捨てられます。
+
+### 5-4. bridge をフレームワーク / ライブラリ側に持たせる
 
 `RepoSearchBridge`（型変換とイベント定義）は **`RepoSearchKit.xcframework` と
 `reposearchkit.aar` の中**にあります。ホストアプリは成果物を取り込むだけで
@@ -395,7 +436,7 @@ Xcode / Android Studio 上ではターゲットのメンバーとして通常ど
 > `The document "..." could not be saved. The file doesn't exist.` で失敗します。
 > リンクにすると IDE から編集できなくなります。
 
-### 5-4. RN インスタンスの破棄とメモリ
+### 5-5. RN インスタンスの破棄とメモリ
 
 `ReactNativeHostManager.shared.initialize()` で作られる React Native インスタンスは
 **アプリ内で 1 つだけ**で、RN 画面を開いたり閉じたりしても使い回されます。
@@ -453,6 +494,17 @@ iOS（シミュレータプロセスの RSS）で検索を 8 回:
 > Release ビルドを実機で Instruments（Allocations / Leaks）を使ってください。
 > Android の値もエミュレータのものです。
 
+### ネイティブ → RN の 3 つの手段
+
+| 手段 | 向き | タイミング | 用途 |
+| --- | --- | --- | --- |
+| `initialProps` | ネイティブ → RN | **画面生成時の 1 回だけ** | 起動パラメータ |
+| メッセージ | 双方向 | いつでも | 「〜が起きた」「〜してほしい」という単発の指示 |
+| 共有ステート（`BrownfieldState` / `useSharedState`） | 双方向 | いつでも | 継続的に同期したい値（ログイン状態、テーマなど） |
+
+本サンプルは前 2 つを使っています。共有ステートは `expo-brownfield` が提供していますが、
+このサンプルでは使っていません。
+
 ### API 一覧
 
 `expo-brownfield` が用意している API:
@@ -460,7 +512,7 @@ iOS（シミュレータプロセスの RSS）で検索を 8 回:
 | JS | Swift | 用途 |
 | --- | --- | --- |
 | `popToNative(animated)` | — | RN 画面を閉じてネイティブに戻る |
-| — | `ReactNativeHostManager` | RN インスタンスの初期化と破棄（`5-4`） |
+| — | `ReactNativeHostManager` | RN インスタンスの初期化と破棄（`5-5`） |
 | `setNativeBackEnabled(enabled)` | — | ネイティブの戻る操作の有効/無効 |
 | `sendMessage` / `addMessageListener` | `BrownfieldMessaging` | 双方向メッセージ |
 | `useSharedState(key)` | `BrownfieldState` | ネイティブと共有する状態 |

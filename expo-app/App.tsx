@@ -12,7 +12,7 @@ export default function App({ keyword }: RootProps) {
   return (
     <>
       <StatusBar style="dark" />
-      <RepoSearchScreen keyword={keyword ?? DEFAULT_KEYWORD} />
+      <RepoSearchScreen initialKeyword={keyword ?? DEFAULT_KEYWORD} />
     </>
   )
 }

@@ -1,5 +1,5 @@
 import { popToNative } from 'expo-brownfield'
-import { useCallback, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import {
   ActivityIndicator,
   FlatList,
@@ -14,16 +14,34 @@ import {
 import { type Repository, searchRepositories } from '../api/github'
 import { ActionButton } from '../components/ActionButton'
 import { RepositoryRow } from '../components/RepositoryRow'
-import { notifySearchFailed, notifySearchSucceeded } from '../native/bridge'
+import {
+  addKeywordListener,
+  notifySearchFailed,
+  notifySearchSucceeded,
+} from '../native/bridge'
 
 type Props = {
-  keyword: string
+  /** Handed over by the host app through `initialProps`. */
+  initialKeyword: string
 }
 
-export function RepoSearchScreen({ keyword }: Props) {
+export function RepoSearchScreen({ initialKeyword }: Props) {
+  // initialProps only arrives while the host app is creating this screen, so
+  // replacing the keyword on an open screen comes over the message channel.
+  const [keyword, setKeyword] = useState(initialKeyword)
   const [repositories, setRepositories] = useState<Repository[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  useEffect(
+    () =>
+      addKeywordListener((next) => {
+        setKeyword(next)
+        setRepositories([])
+        setError(null)
+      }),
+    [],
+  )
 
   const onPressSearch = useCallback(async () => {
     setIsLoading(true)

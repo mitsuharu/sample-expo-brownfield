@@ -1,9 +1,11 @@
 package com.example.sample.expo.brownfield.host
 
 import com.example.sample.expo.brownfield.reposearchkit.RepoSearchBridge
+import com.example.sample.expo.brownfield.reposearchkit.RepoSearchCommand
 import com.example.sample.expo.brownfield.reposearchkit.RepoSearchEvent
 import com.example.sample.expo.brownfield.reposearchkit.RepoSearchListener
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -140,5 +142,27 @@ class RepoSearchBridgeTest {
     bridge.start()
     bridge.stop()
     bridge.stop()
+  }
+
+  @Test
+  fun `builds the setKeyword payload`() {
+    val payload = RepoSearchBridge.payload(RepoSearchCommand.SetKeyword("swift"))
+
+    assertEquals("setKeyword", payload["type"])
+    assertEquals("swift", payload["keyword"])
+  }
+
+  @Test
+  fun `the setKeyword payload carries no nested null`() {
+    // A nested null cannot be converted to a Kotlin type, so the shared wire
+    // format never carries one.
+    val payload = RepoSearchBridge.payload(RepoSearchCommand.SetKeyword("swift"))
+
+    payload.forEach { (key, value) -> assertNotNull(key, value) }
+  }
+
+  @Test
+  fun `sending without a react native runtime is harmless`() {
+    RepoSearchBridge().send(RepoSearchCommand.SetKeyword("swift"))
   }
 }

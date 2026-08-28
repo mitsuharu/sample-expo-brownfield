@@ -32,6 +32,14 @@ public enum RepoSearchEvent {
   case failed(keyword: String, message: String)
 }
 
+/// What the host app asks the React Native screen to do. The mirror image of
+/// `RepoSearchEvent`.
+public enum RepoSearchCommand {
+  /// Replaces the keyword on a screen that is already open. `initialProps`
+  /// only reaches the screen while it is being created.
+  case setKeyword(String)
+}
+
 public protocol RepoSearchBridgeDelegate: AnyObject {
   func repoSearchBridge(_ bridge: RepoSearchBridge, didReceive event: RepoSearchEvent)
 }
@@ -70,6 +78,23 @@ public final class RepoSearchBridge {
     guard let listenerID else { return }
     BrownfieldMessaging.removeListener(id: listenerID)
     self.listenerID = nil
+  }
+
+  /// Sends a command to the React Native screen.
+  ///
+  /// Unlike receiving, this needs no listener: the message goes out whether or
+  /// not the screen is on top, and is ignored when nothing is listening.
+  public func send(_ command: RepoSearchCommand) {
+    BrownfieldMessaging.sendMessage(Self.payload(for: command))
+  }
+
+  /// The wire format for a command. Public so host apps can unit test what
+  /// crosses the bridge without a React Native runtime.
+  public static func payload(for command: RepoSearchCommand) -> [String: Any?] {
+    switch command {
+    case .setKeyword(let keyword):
+      return ["type": "setKeyword", "keyword": keyword]
+    }
   }
 
   /// Converts one raw message and delivers the event on the main queue.

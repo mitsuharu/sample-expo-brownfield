@@ -20,6 +20,18 @@ sealed interface RepoSearchEvent {
   data class Failed(val keyword: String, val message: String) : RepoSearchEvent
 }
 
+/**
+ * What the host app asks the React Native screen to do. The mirror image of
+ * [RepoSearchEvent].
+ */
+sealed interface RepoSearchCommand {
+  /**
+   * Replaces the keyword on a screen that is already open. `initialProps` only
+   * reaches the screen while it is being created.
+   */
+  data class SetKeyword(val keyword: String) : RepoSearchCommand
+}
+
 /** The delegate-style callback. */
 fun interface RepoSearchListener {
   fun onRepoSearchEvent(event: RepoSearchEvent)
@@ -53,6 +65,28 @@ class RepoSearchBridge(
       BrownfieldMessaging.removeListener(id)
       listenerId = null
     }
+  }
+
+  /**
+   * Sends a command to the React Native screen.
+   *
+   * Unlike receiving, this needs no listener: the message goes out whether or
+   * not the screen is on top, and is ignored when nothing is listening.
+   */
+  fun send(command: RepoSearchCommand) {
+    BrownfieldMessaging.sendMessage(payload(command))
+  }
+
+  companion object {
+    /**
+     * The wire format for a command. Public so host apps can unit test what
+     * crosses the bridge without a React Native runtime.
+     */
+    fun payload(command: RepoSearchCommand): Map<String, Any?> =
+      when (command) {
+        is RepoSearchCommand.SetKeyword ->
+          mapOf("type" to "setKeyword", "keyword" to command.keyword)
+      }
   }
 
   /**

@@ -107,8 +107,10 @@ private struct RepoSearchScreen: View {
         // initialProps is fixed once this screen exists, so changing the
         // keyword from here goes over the message channel instead.
         Menu("キーワード") {
-          ForEach(presetKeywords, id: \.self) { preset in
-            Button(preset) { bridge.send(.setKeyword(preset)) }
+          Section("ネイティブ → RN にメッセージ送信") {
+            ForEach(presetKeywords, id: \.self) { preset in
+              Button(preset) { bridge.send(.setKeyword(preset)) }
+            }
           }
         }
       }

@@ -6,6 +6,7 @@ import android.os.Bundle
 import android.view.ViewGroup
 import android.widget.Button
 import android.widget.LinearLayout
+import android.widget.TextView
 import android.widget.Toast
 import androidx.core.os.bundleOf
 import com.example.sample.expo.brownfield.reposearchkit.BrownfieldActivity
@@ -69,6 +70,12 @@ class RepoSearchActivity : BrownfieldActivity() {
    * from here goes over the message channel instead.
    */
   private fun withKeywordBar(reactNativeView: android.view.View): ViewGroup {
+    val caption =
+      TextView(this).apply {
+        text = getString(R.string.send_to_react_native)
+        setPadding(32, 24, 32, 0)
+      }
+
     val bar =
       LinearLayout(this).apply {
         orientation = LinearLayout.HORIZONTAL
@@ -86,6 +93,13 @@ class RepoSearchActivity : BrownfieldActivity() {
       orientation = LinearLayout.VERTICAL
       // The activity is edge to edge, so the bar would sit under the status bar.
       fitsSystemWindows = true
+      addView(
+        caption,
+        LinearLayout.LayoutParams(
+          LinearLayout.LayoutParams.MATCH_PARENT,
+          LinearLayout.LayoutParams.WRAP_CONTENT,
+        ),
+      )
       addView(
         bar,
         LinearLayout.LayoutParams(
